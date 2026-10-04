@@ -220,5 +220,14 @@ def test_health() -> None:
     assert TestClient(app).get("/health").json() == {"status": "ok"}
 
 
+def test_cors_allows_frontend_origin_only() -> None:
+    tc = TestClient(app)
+    preflight = {"Access-Control-Request-Method": "POST"}
+    ok = tc.options("/search", headers={"Origin": "http://localhost:3000", **preflight})
+    assert ok.headers.get("access-control-allow-origin") == "http://localhost:3000"
+    other = tc.options("/search", headers={"Origin": "https://evil.example", **preflight})
+    assert "access-control-allow-origin" not in other.headers
+
+
 def test_unused_fixture_data_is_consistent() -> None:
     assert set(ATTRS) == set(MOVIES)

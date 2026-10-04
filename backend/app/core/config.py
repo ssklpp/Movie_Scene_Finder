@@ -53,6 +53,8 @@ class Settings(BaseSettings):
 
     # Ops
     rate_limit_per_day: int = 30
+    # 브라우저에서 API를 부를 수 있는 프런트엔드 주소(JSON 배열). 배포 시 Vercel 도메인을 더한다.
+    cors_origins: list[str] = ["http://localhost:3000"]
     langsmith_api_key: str = ""
     langsmith_project: str = "movie-scene-finder"
 
