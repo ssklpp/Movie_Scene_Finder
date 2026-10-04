@@ -66,6 +66,7 @@
 - **Frontend**: Next.js 16, TypeScript, Tailwind
 - **배포**: Railway(backend, PostgreSQL), Vercel(frontend), Qdrant Cloud, Cloudflare R2(썸네일)
 - **Tooling**: uv, pnpm, ruff, mypy `--strict`, pytest, GitHub Actions
+- **관측**: LangSmith(요청별 노드·LLM 호출 추적, 사용자 사진은 가려서 기록)
 
 ## 시작하기
 
@@ -140,7 +141,7 @@ make dev                                        # backend(:8000) + frontend(:300
 | 구성 | 위치 | 설정 |
 | --- | --- | --- |
 | frontend | Vercel (Root Directory `frontend`) | `NEXT_PUBLIC_API_URL` = backend 주소 |
-| backend | Railway (`backend/Dockerfile`, `railway.json`) | `.env.example`의 값, `DATABASE_URL`, `CORS_ORIGINS`(Vercel 주소), `R2_PUBLIC_URL` |
+| backend | Railway (`backend/Dockerfile`, `railway.json`) | `.env.example`의 값, `DATABASE_URL`, `CORS_ORIGINS`(Vercel 주소), `R2_PUBLIC_URL`, (추적 시) `LANGSMITH_TRACING=true`·`LANGSMITH_API_KEY` |
 | PostgreSQL | Railway | backend 시작 시 `alembic upgrade head`. 영화·장면 목록은 `scripts/copy_catalog.sh <DATABASE_URL>`로 로컬에서 복사 |
 | Qdrant | Qdrant Cloud | 로컬 `.env`의 `QDRANT_URL`·`QDRANT_API_KEY`를 클라우드로 바꾸고 `s08_upload` 실행 |
 | 썸네일 | Cloudflare R2 (r2.dev 공개 주소) | 로컬에서 `s08_upload`가 업로드. R2 키는 로컬에만 둔다 |

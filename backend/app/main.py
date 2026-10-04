@@ -9,8 +9,10 @@ from slowapi.errors import RateLimitExceeded
 from app.api import routes_feedback, routes_movies, routes_search
 from app.core.config import get_settings
 from app.core.logging import setup_logging
+from app.core.tracing import setup_tracing
 
 setup_logging()
+setup_tracing()  # OpenAI 클라이언트(core/llm.py)를 처음 만들기 전에 켜야 한다
 
 
 @asynccontextmanager

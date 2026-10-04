@@ -21,6 +21,7 @@ dependencies = [
     "sse-starlette>=3.5.0",
     "slowapi>=0.1.10",
     "python-multipart>=0.0.32",
+    "langsmith>=0.14.4",
 ]
 
 [build-system]

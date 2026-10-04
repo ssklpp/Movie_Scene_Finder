@@ -118,14 +118,19 @@ class AgentRuntime:
         session_id = session_id or str(uuid.uuid4())
         self.store.create(session_id, query_text, image_key)
         yield event("session", {"session_id": session_id})
-        yield from self._run(session_id, initial_state(session_id, query_text, image_key))
+        yield from self._run(session_id, initial_state(session_id, query_text, image_key), "search")
 
     def resume(self, session_id: str, value: str) -> Iterator[Event]:
         yield event("session", {"session_id": session_id})
-        yield from self._run(session_id, Command(resume=value))
+        yield from self._run(session_id, Command(resume=value), "answer")
 
-    def _run(self, session_id: str, graph_input: Any) -> Iterator[Event]:
-        config = self._config(session_id)
+    def _run(self, session_id: str, graph_input: Any, request: str) -> Iterator[Event]:
+        # LangSmith: 요청마다 trace 하나. session_id 메타데이터로 첫 검색과 재질문 답을 묶는다.
+        config: RunnableConfig = {
+            **self._config(session_id),
+            "run_name": request,
+            "metadata": {"session_id": session_id, "request": request},
+        }
         started = time.perf_counter()
         try:
             for update in self.graph.stream(graph_input, config, stream_mode="updates"):

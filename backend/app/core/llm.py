@@ -16,6 +16,7 @@ from pydantic import BaseModel
 
 from app.core.config import get_settings
 from app.core.cost import usd_cost
+from app.core.tracing import traced_client
 
 logger = logging.getLogger(__name__)
 
@@ -32,8 +33,8 @@ class CallStats:
 @lru_cache
 def get_client() -> OpenAI:
     s = get_settings()
-    return OpenAI(
-        api_key=s.openai_api_key, timeout=s.http_timeout_s, max_retries=s.http_max_retries
+    return traced_client(
+        OpenAI(api_key=s.openai_api_key, timeout=s.http_timeout_s, max_retries=s.http_max_retries)
     )
 
 

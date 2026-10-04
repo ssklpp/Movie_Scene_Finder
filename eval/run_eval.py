@@ -42,6 +42,7 @@ from app.agent.checkpoint import make_serde
 from app.agent.graph import build_graph, initial_state
 from app.core.config import REPO_ROOT, ReasoningEffort, get_settings
 from app.core.logging import setup_logging
+from app.core.tracing import setup_tracing
 from app.db.models import EvalRun, Movie
 from app.db.session import SessionLocal
 from app.search.aggregate import aggregate
@@ -312,8 +313,15 @@ def main() -> None:
     parser.add_argument("--no-agent", action="store_true", help="에이전트 없이 검색만 평가")
     parser.add_argument("--limit", type=int, help="앞 N개 질의만(시험용, eval_runs에 기록 안 함)")
     parser.add_argument("--workers", type=int, help="동시 질의 수(기본: 에이전트 4, 검색만 1)")
+    parser.add_argument(
+        "--trace",
+        action="store_true",
+        help="LangSmith 추적(프로젝트 <LANGSMITH_PROJECT>-eval). 무료 한도 때문에 기본은 끈다",
+    )
     args = parser.parse_args()
     setup_logging()
+    if args.trace and not setup_tracing(project=f"{get_settings().langsmith_project}-eval"):
+        parser.error("--trace needs LANGSMITH_TRACING=true and LANGSMITH_API_KEY in .env")
     for noisy in ("httpx", "httpx2", "app.core.llm", "app.search.sparse", "app.agent"):
         logging.getLogger(noisy).setLevel(logging.WARNING)
 

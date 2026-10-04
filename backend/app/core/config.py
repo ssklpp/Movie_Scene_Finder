@@ -64,6 +64,8 @@ class Settings(BaseSettings):
     rate_limit_per_day: int = 30
     # 브라우저에서 API를 부를 수 있는 프런트엔드 주소(JSON 배열). 배포 시 Vercel 도메인을 더한다.
     cors_origins: list[str] = ["http://localhost:3000"]
+    # 추적은 서버(와 평가에서 켰을 때)만 한다(core/tracing.py). 키가 없으면 켜지지 않는다.
+    langsmith_tracing: bool = False
     langsmith_api_key: str = ""
     langsmith_project: str = "movie-scene-finder"
 
