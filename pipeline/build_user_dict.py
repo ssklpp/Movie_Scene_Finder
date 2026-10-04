@@ -77,7 +77,7 @@ def main() -> None:
 
     with SessionLocal() as session:
         stmt = select(Movie.tmdb_id, Movie.title_ko).order_by(Movie.id).limit(args.limit)
-        movies = list(session.execute(stmt).tuples())
+        movies = list(session.execute(stmt).all())
 
     CREDITS_DIR.mkdir(parents=True, exist_ok=True)
     settings = get_settings()

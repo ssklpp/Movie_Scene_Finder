@@ -110,7 +110,7 @@ def main() -> None:
 
     with SessionLocal() as session:
         stmt = select(Movie.id, Movie.tmdb_id).order_by(Movie.id).limit(args.limit)
-        movies = list(session.execute(stmt).tuples())
+        movies = list(session.execute(stmt).all())
 
     state = State()
     processed = skipped = images = scenes = 0
