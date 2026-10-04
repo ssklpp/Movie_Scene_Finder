@@ -2,6 +2,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -61,6 +62,16 @@ class Settings(BaseSettings):
     # External API calls (SPEC §0.4)
     http_timeout_s: float = 30.0
     http_max_retries: int = 3
+
+    @field_validator("database_url")
+    @classmethod
+    def use_psycopg_driver(cls, url: str) -> str:
+        """Railway 등은 postgres:// 또는 postgresql:// 형식을 준다. SQLAlchemy가 설치된
+        psycopg(3) 드라이버를 쓰도록 postgresql+psycopg://로 바꾼다."""
+        for prefix in ("postgres://", "postgresql://"):
+            if url.startswith(prefix):
+                return "postgresql+psycopg://" + url[len(prefix) :]
+        return url
 
 
 @lru_cache
