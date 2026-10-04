@@ -1,0 +1,42 @@
+[project]
+name = "movie-scene-finder"
+version = "0.1.0"
+description = "장면 기억 검색기: workspace root (pipeline, eval)"
+requires-python = ">=3.12,<3.13"
+dependencies = ["msf-backend"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "ruff>=0.6",
+    "mypy>=1.11",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["backend"]
+
+[tool.uv.sources]
+msf-backend = { workspace = true }
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["frontend", "pipeline/data"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app", "pipeline", "eval"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+plugins = ["pydantic.mypy"]
+exclude = ["^backend/alembic/"]
+
+[tool.pytest.ini_options]
+testpaths = ["backend/tests"]
