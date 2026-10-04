@@ -2,7 +2,9 @@
 
 기억나는 영화 장면을 글이나 사진으로 설명하면 어떤 영화인지 찾아 주는 검색 서비스입니다.
 
-> **개발 중입니다.** 검색 에이전트, API, 검색 화면까지 로컬에서 동작하고, 배포는 아직입니다.
+**데모: https://movie-scene-finder-pi.vercel.app**
+
+> **개발 중입니다.** 검색 에이전트, API, 검색 화면을 배포해 공개 URL에서 동작합니다. 실험과 최종 평가(Phase 6)가 남았습니다.
 > 구현 순서와 상세 명세는 [SPEC.md](SPEC.md)를 따릅니다.
 
 ## 동작 방식
@@ -22,11 +24,12 @@
 | 2 | VLM 캡셔닝, Qdrant 적재 | 완료 |
 | 3 | 하이브리드 검색, 첫 평가 | 완료 |
 | 4 | LangGraph 에이전트(재질문), API | 완료 |
-| 5 | 프론트엔드, 배포 | 다음 단계 |
+| 5 | 프론트엔드, 배포 | 완료 (응답 시간 개선 남음) |
 | 6 | 실험, 문서화 | 예정 |
 
 지금까지 만든 데이터: 영화 300편(한국 영화 약 60편 포함), 이미지 4,446장, 중복을 걸러 낸 장면 3,852개와
 장면마다의 한국어 캡션(`gpt-6-luna`, 검증 실패 0.18%), Qdrant 색인(장면 3,852개, 줄거리 299편),
+결과 화면용 장면 썸네일 3,852장(Cloudflare R2),
 사람이 직접 쓴 평가 질의 20개([작성 안내](eval/human_guide.md)), 합성 평가 질의 300개.
 
 ### 첫 평가 (E1, dev 합성 질의 200개, 질의 재작성·재질문 없이 검색만)
@@ -50,15 +53,17 @@
 | 1회 | 0.825 | 0.840 | 0.832 | 0.14회 | 약 1.0원 |
 | 2회 | 0.860 | 0.875 | 0.867 | 0.28회 | 약 1.1원 |
 
-응답 한 번에 약 10초가 걸려 목표(8초)보다 깁니다. 최종 수치는 Phase 6에서 test 데이터(사람이 쓴 질의 포함)로 한 번 측정합니다.
+응답 시간은 배포 환경(한국에서 순차 11회)에서 중간값 6.9초, 가장 느린 경우 9.4초로 목표(p95 8초)를 아직 넘습니다.
+대부분이 OpenAI 호출(질의 재작성 약 2초, 검증 3~6초)이고 검색 자체는 약 0.3초입니다. 최종 수치는 Phase 6에서 test 데이터(사람이 쓴 질의 포함)로 한 번 측정합니다.
 
 ## 기술 스택
 
 - **Backend**: Python 3.12, FastAPI, SQLAlchemy + Alembic, PostgreSQL 16
 - **Search**: Qdrant(dense + sparse), OpenAI 임베딩, Kiwi 형태소 분석(kiwipiepy)
-- **Agent**: LangGraph (예정)
+- **Agent**: LangGraph (PostgresSaver 체크포인터로 재질문 대기 세션 보존), SSE 스트리밍
 - **VLM 캡셔닝**: `gpt-6-luna`. 로컬 Qwen3-VL-4B(AWQ 4비트, vLLM)와 비교해 결정
-- **Frontend**: Next.js, TypeScript, Tailwind (예정)
+- **Frontend**: Next.js 16, TypeScript, Tailwind
+- **배포**: Railway(backend, PostgreSQL), Vercel(frontend), Qdrant Cloud, Cloudflare R2(썸네일)
 - **Tooling**: uv, pnpm, ruff, mypy `--strict`, pytest, GitHub Actions
 
 ## 시작하기
@@ -93,12 +98,13 @@ uv run python -m pipeline.s04_caption           # 장면 캡션(VLM) → scenes.
 uv run python -m pipeline.s05_validate          # 캡션 검증·재시도, 검수 표본 → reports/
 uv run python -m pipeline.s06_build_docs        # 검색 문서(제목 제외)
 uv run python -m pipeline.s07_embed             # dense·sparse(BM25) 벡터
-uv run python -m pipeline.s08_upload            # Qdrant 적재, 별칭 scenes 교체
+uv run python -m pipeline.s08_upload            # Qdrant 적재, 별칭 scenes 교체, 썸네일 R2 업로드
 ```
 
 - 대부분의 단계에 `--limit N`(앞 N편만 처리)과 `--force`(이미 처리한 것도 다시)를 줄 수 있습니다.
 - 다시 실행하면 처리한 항목은 건너뜁니다. 진행 상태는 `pipeline/data/state.sqlite`에 남습니다.
 - 수집한 이미지와 중간 결과(`pipeline/data/`)는 저장소에 올리지 않습니다.
+- 썸네일 업로드는 `.env`에 R2 키(`R2_ACCOUNT_ID` 등)가 있을 때만 합니다. 없으면 건너뛰고 결과 화면에는 캡션만 나옵니다.
 
 ### 검색 API (Phase 4)
 
@@ -125,7 +131,18 @@ make dev                                        # backend(:8000) + frontend(:300
 ```
 
 브라우저에서 `http://localhost:3000`을 열고 기억나는 장면을 적거나 사진을 올립니다.
-진행 단계, 재질문 선택지, 결과(포스터, 추천 이유, 질의 단어가 강조된 근거 장면, "맞아요/아니에요")가 차례로 나옵니다.
+진행 단계, 재질문 선택지, 결과(포스터, 추천 이유, 근거 장면 썸네일과 질의 단어가 강조된 캡션, "맞아요/아니에요")가 차례로 나옵니다.
+썸네일은 backend `.env`의 `R2_PUBLIC_URL`(R2 버킷 공개 주소)이 있을 때만 나옵니다.
+
+### 배포
+
+| 구성 | 위치 | 설정 |
+| --- | --- | --- |
+| frontend | Vercel (Root Directory `frontend`) | `NEXT_PUBLIC_API_URL` = backend 주소 |
+| backend | Railway (`backend/Dockerfile`, `railway.json`) | `.env.example`의 값, `DATABASE_URL`, `CORS_ORIGINS`(Vercel 주소), `R2_PUBLIC_URL` |
+| PostgreSQL | Railway | backend 시작 시 `alembic upgrade head`. 영화·장면 목록은 `scripts/copy_catalog.sh <DATABASE_URL>`로 로컬에서 복사 |
+| Qdrant | Qdrant Cloud | 로컬 `.env`의 `QDRANT_URL`·`QDRANT_API_KEY`를 클라우드로 바꾸고 `s08_upload` 실행 |
+| 썸네일 | Cloudflare R2 (r2.dev 공개 주소) | 로컬에서 `s08_upload`가 업로드. R2 키는 로컬에만 둔다 |
 
 ### 평가
 
@@ -151,8 +168,8 @@ make dev                                                  # backend(:8000) + fro
 backend/    FastAPI 앱(app/), DB 모델, Alembic 마이그레이션, 검색 모듈(search/), 테스트
 pipeline/   오프라인 인덱싱 단계(s01~s08)와 공용 모듈(common/)
 eval/       평가 데이터셋(human 20개, synthetic 300개), 실험 설정, 평가 스크립트
-scripts/    로컬 VLM(vLLM) 실행 스크립트
-frontend/   Next.js 앱 (예정)
+scripts/    로컬 VLM(vLLM) 실행, 배포 DB 카탈로그 복사 스크립트
+frontend/   Next.js 앱 (검색 화면)
 SPEC.md     구현 명세
 ```
 
