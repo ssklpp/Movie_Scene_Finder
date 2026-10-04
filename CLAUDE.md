@@ -11,7 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - 저장소는 WSL 홈(`~/projects/movie-scene-finder`)에 있다. 모든 명령은 WSL2 셸에서 실행한다(`/mnt/c/...`나 Windows 쪽 Python·Node는 쓰지 않는다).
 - Python 프로젝트는 backend·pipeline·eval이 함께 쓰는 uv workspace 하나로 만든다(`requires-python = ">=3.12,<3.13"`, §12 Phase 0). §3 트리에 보이는 `backend/pyproject.toml`은 workspace 멤버다.
 
-## 명령 (Phase 0에서 만들 Makefile 기준)
+## 명령
 
 ```bash
 make up            # docker compose: qdrant, postgres
@@ -58,3 +58,22 @@ Python은 항상 `uv run`으로 실행한다(Python 3.12로 고정하고 시스�
 - 예고편 처리는 `--with-trailers`를 줄 때만 실행한다. 원본 영상과 `pipeline/data/`는 커밋하지 않는다.
 - VLM 캡션 프롬프트에 인물(배우) 이름을 생성하지 말라고 명시한다.
 - 검색·집계·확신도·재질문 로직에는 단위 테스트를 작성하고, pytest·ruff·`mypy --strict`가 통과해야 커밋한다. 새 의존성을 추가하면 이유를 커밋 메시지에 적는다.
+
+## 커밋 메시지 (Conventional Commits)
+
+`<type>(<scope>): <제목>` 형식으로 쓰고, 제목과 본문은 한국어로 쓴다. 기존 커밋 `78dd308`~`4db2ec6`은 이 규칙 이전의 `Phase N: ...` 형식이며 다시 쓰지 않는다.
+
+| type | 언제 |
+| --- | --- |
+| `feat` | 새 기능 (예: 파이프라인 단계, API 엔드포인트) |
+| `fix` | 버그 수정 |
+| `refactor` | 동작은 같고 구조 개선 |
+| `test` | 테스트만 추가·수정 |
+| `ci` | GitHub Actions |
+| `docs` | 문서만 (`CLAUDE.md`, `SPEC.md`, README) |
+| `chore` | 의존성, 설정 등 코드 동작과 무관한 작업 |
+
+- scope는 바뀐 영역이다: `pipeline`, `backend`, `frontend`, `eval`. 여러 영역이면 생략한다.
+- 예: `feat(pipeline): s04 VLM 캡션 생성`, `fix(backend): SSE 재개 시 세션 누락 수정`
+- 본문에는 무엇을 왜 바꿨는지, SPEC과 다르게 정한 것과 그 이유, 새 의존성과 추가 이유를 적는다.
+- 한 커밋이 여러 종류에 걸치면 주된 변경의 type을 쓴다. 기능과 함께 쓴 테스트는 `feat`에 포함한다.
