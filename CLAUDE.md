@@ -6,11 +6,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 현재 상태
 
-- **현재 Phase: 4 (에이전트와 API)**. Phase 0·1·2·3 완료(2026-10-04).
+- **현재 Phase: 5 (프론트엔드와 배포)**. Phase 0·1·2·3·4 완료(2026-10-04).
   - Phase 1 결과: movies 300편, 이미지 4,446장, scenes 3,852행, Kiwi 사용자 사전, human 질의 20개. KMDb 줄거리 보강은 API 키 발급 대기 중(완료 기준 밖).
   - Phase 2 결과: 캡션 3,852장(gpt-6-luna), 검증 실패 0.18%, 검수 50장 환각 0건, 로컬 Qdrant `scenes`(→ `scenes_v2`) 3,852 포인트 = scenes 행 수, `movies` 299 포인트.
   - Phase 3 결과: `search/filters.py`·`hybrid.py`·`aggregate.py`, synthetic 300개, `eval/run_eval.py`·`report.py`, E1 결과표(아래 구현 메모). hybrid가 dev에서 dense보다 나음을 확인했다.
-  - Phase 4에 남은 것: `agent/`(§8), `search/confidence.py`·`clarify.py`와 단위 테스트, API(§9: SSE, 재개, 피드백, rate limit), 재질문 시뮬레이터와 E6.
+  - Phase 4 결과: `search/confidence.py`·`clarify.py`, `agent/`(LangGraph, PostgresSaver), API(SSE·재개·피드백·rate limit), 재질문 시뮬레이터, E6 결과표(아래 구현 메모). curl 시나리오 1과 서버 재시작 후 재개를 실제 서버로 확인했다.
+  - Phase 5에 남은 것: 프론트엔드(§10: 검색·재질문·결과 화면, 이미지 업로드), 배포(Railway·Qdrant Cloud·Vercel, CORS), R2 썸네일(s08 업로드와 thumb_url), 사용자 사전·bm25_stats를 backend 배포에 포함하는 방법. **지연시간(요청 p95 약 10초, SPEC 목표 8초)** 개선 과제도 남아 있다.
   - 원격 저장소: https://github.com/ssklpp/Movie_Scene_Finder. Phase 완료 기준(§12)을 통과하면 이 항목을 갱신한다.
 - 현재 Phase의 완료 기준을 통과하기 전에는 다음 Phase 코드를 만들지 않는다.
 - 저장소는 WSL 홈(`~/projects/movie-scene-finder`)에 있다. 모든 명령은 WSL2 셸에서 실행한다(`/mnt/c/...`나 Windows 쪽 Python·Node는 쓰지 않는다).
@@ -87,6 +88,8 @@ Python은 항상 `uv run`으로 실행한다(Python 3.12로 고정하고 시스�
   - rewrite의 soft_filters는 OpenAI strict 구조화 출력이 자유 키 dict를 받지 않아 고정 필드(`SoftFilterFields`)로 받고, 형식이 틀린 값은 코드에서 버린다.
   - verify 입력에 후보의 제목·연도를 준다(LLM의 영화 지식 활용). 대신 "제목 글자로 점수를 올리지 말 것", "흔한 장면이면 0.5 이하"를 프롬프트에 넣었다. 넣기 전에는 "누군가를 쫓아가는 장면"에 "추격자"를 0.88로 과신했다.
 - API(§9): `agent/runtime.py`가 그래프를 돌려 SSE 이벤트를 만들고 세션을 기록한다(FastAPI 없이 테스트 가능). 서버는 시작할 때 Postgres 연결 풀 체크포인터로 그래프를 한 번 만든다(`main.py` lifespan). `question` 이벤트에는 SPEC 필드 외에 화면용 `labels`가 있다. `sessions.latency_ms`는 노드 처리 시간 합(사용자가 답을 기다린 시간 제외). rate limit은 `/search`만 센다. 테스트는 `app.state.runtime`에 메모리 체크포인터 실행기를 넣고 TestClient를 `with` 없이 써서 lifespan을 건너뛴다. DB 테스트는 Postgres가 없으면 skip되고 CI는 Postgres 서비스로 돌린다.
+- 에이전트 평가: `uv run python -m eval.run_eval --config eval/configs/E6_turns2.yaml --split dev`(설정 `agent: true`, `--no-agent` 없이). 메모리 체크포인터로 돌리고 재질문은 `eval/simulator.py`가 정답 영화 속성으로 답한다(값이 선택지에 없으면 "모르겠어요"). 사람이 속성을 정확히 기억한다는 가정이라 실제보다 유리하다. 질의를 4개씩 동시에 돌린다(`--workers`). p95는 요청(invoke) 1회 기준이며 동시 실행 탓에 다소 높게 잡힌다. `clarify_success` = 재질문을 한 질의 중 최종 1위가 정답인 비율(SPEC에 정의가 없어 정함).
+- **E6 결과(dev, synthetic 200, 시뮬레이터, 2026-10-04)**: turns0 R@1 0.815 / R@5 0.820 / MRR 0.818, turns1 0.825 / 0.840 / 0.832(평균 재질문 0.14, clarify_success 0.31), **turns2 0.860 / 0.875 / 0.867(평균 재질문 0.28, clarify_success 0.42)**. 요청 p95 10.2~11.1초, 질의당 $0.00065~0.00082(약 1원). 에이전트가 검색만 할 때(E1 hybrid R@1 0.205)보다 크게 낫다(재작성 + 영화 지식을 쓰는 검증). R@1과 R@5가 거의 같아, 못 찾는 질의는 대부분 정답이 후보 10편에 들지 않은 경우다. 이 실행의 커밋 값은 `ffc08d5-dirty`(평가 코드 커밋 전)다.
 - 체크포인트 상태의 pydantic 모델은 `agent/state.py`의 `STATE_MODELS`에 등록해야 복원된다(`checkpoint.make_serde`). 새 모델을 상태에 넣으면 여기에도 추가한다.
 - 실제 실행 관찰(2026-10-04): 질의당 비용 약 $0.0006(재질문 2회 세션 약 $0.0018). **지연시간이 SPEC 목표를 넘는다**: verify 1회 약 7초, rewrite 1.5~3초 → 첫 응답 약 10초, 재질문마다 7~10초 추가. 서버 재시작 후 재개(새 연결·새 그래프)는 동작을 확인했다. 기생충 "물난리" 질의처럼 수집 이미지와 줄거리에 없는 장면은 재질문 후에도 후보에 들지 않는다.
 - 로컬 VLM은 E2 재실험용으로 남겨 둔다. `scripts/run_vlm.sh`로 띄운다(vLLM은 프로젝트 venv가 아닌 `~/.venvs/vllm`, vllm 0.30.0). 시작에 약 100초 걸린다.

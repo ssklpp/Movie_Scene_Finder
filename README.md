@@ -2,7 +2,7 @@
 
 기억나는 영화 장면을 글이나 사진으로 설명하면 어떤 영화인지 찾아 주는 검색 서비스입니다.
 
-> **개발 중입니다.** 지금은 Phase 3(하이브리드 검색과 첫 평가)까지 구현되어 있고, 검색 API와 화면은 아직 없습니다.
+> **개발 중입니다.** 지금은 Phase 4(검색 에이전트와 API)까지 구현되어 있고, 화면과 배포는 아직 없습니다.
 > 구현 순서와 상세 명세는 [SPEC.md](SPEC.md)를 따릅니다.
 
 ## 동작 방식
@@ -21,8 +21,8 @@
 | 1 | 영화·이미지 수집, 중복 제거, 형태소 분석 사전, 평가 질의 수집 | 완료 |
 | 2 | VLM 캡셔닝, Qdrant 적재 | 완료 |
 | 3 | 하이브리드 검색, 첫 평가 | 완료 |
-| 4 | LangGraph 에이전트(재질문), API | 다음 단계 |
-| 5 | 프론트엔드, 배포 | 예정 |
+| 4 | LangGraph 에이전트(재질문), API | 완료 |
+| 5 | 프론트엔드, 배포 | 다음 단계 |
 | 6 | 실험, 문서화 | 예정 |
 
 지금까지 만든 데이터: 영화 300편(한국 영화 약 60편 포함), 이미지 4,446장, 중복을 걸러 낸 장면 3,852개와
@@ -37,7 +37,20 @@
 | sparse (BM25) | 0.210 | 0.375 | 0.293 |
 | hybrid (RRF) | 0.205 | 0.410 | 0.286 |
 
-질의 재작성과 재질문(Phase 4)을 붙이기 전의 기준선입니다. 최종 수치는 Phase 6에서 test 데이터로 한 번 측정합니다.
+질의 재작성과 재질문(Phase 4)을 붙이기 전의 기준선입니다.
+
+### 에이전트 평가 (E6, dev 합성 질의 200개, 재질문 최대 횟수 비교)
+
+질의 재작성 → 하이브리드 검색 → LLM 검증 → 재질문을 모두 거친 결과입니다. 재질문에는 정답 영화의
+연대·국가·장르로 자동 응답했습니다(사람이 정확히 기억한다는 가정이라 실제보다 유리합니다).
+
+| 최대 재질문 | Recall@1 | Recall@5 | MRR | 평균 재질문 | 질의당 비용 |
+| --- | --- | --- | --- | --- | --- |
+| 0회 | 0.815 | 0.820 | 0.818 | 0 | 약 0.9원 |
+| 1회 | 0.825 | 0.840 | 0.832 | 0.14회 | 약 1.0원 |
+| 2회 | 0.860 | 0.875 | 0.867 | 0.28회 | 약 1.1원 |
+
+응답 한 번에 약 10초가 걸려 목표(8초)보다 깁니다. 최종 수치는 Phase 6에서 test 데이터(사람이 쓴 질의 포함)로 한 번 측정합니다.
 
 ## 기술 스택
 
@@ -87,12 +100,30 @@ uv run python -m pipeline.s08_upload            # Qdrant 적재, 별칭 scenes �
 - 다시 실행하면 처리한 항목은 건너뜁니다. 진행 상태는 `pipeline/data/state.sqlite`에 남습니다.
 - 수집한 이미지와 중간 결과(`pipeline/data/`)는 저장소에 올리지 않습니다.
 
+### 검색 API (Phase 4)
+
+인덱싱을 마친 뒤 서버를 띄우면 SSE 스트림으로 검색할 수 있습니다.
+
+```bash
+uv run uvicorn app.main:app --port 8000 --app-dir backend
+
+# 텍스트(또는 -F image=@still.jpg)로 검색: session → status → question 또는 result 이벤트
+curl -N -X POST localhost:8000/search -F 'text=기차 안에서 좀비를 피해 문을 막고 버티는 영화'
+
+# question 이벤트를 받았으면 선택지 값으로 답한다
+curl -N -X POST localhost:8000/search/<session_id>/answer \
+  -H 'Content-Type: application/json' -d '{"value": "2010s"}'
+```
+
+그 밖에 `POST /feedback`, `GET /movies/{id}`, `GET /health`가 있습니다([SPEC §9](SPEC.md)).
+
 ### 평가
 
 ```bash
 uv run python -m eval.make_synthetic                      # 합성 질의 300개 (이미 저장소에 있음)
-uv run python -m eval.run_eval --config eval/configs/E1_hybrid.yaml --split dev --no-agent
-uv run python -m eval.report --experiment E1 --split dev  # 실험 비교표
+uv run python -m eval.run_eval --config eval/configs/E1_hybrid.yaml --split dev --no-agent  # 검색만
+uv run python -m eval.run_eval --config eval/configs/E6_turns2.yaml --split dev             # 에이전트
+uv run python -m eval.report --experiment E6 --split dev  # 실험 비교표
 ```
 
 ### 개발 명령
