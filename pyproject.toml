@@ -39,4 +39,4 @@ plugins = ["pydantic.mypy"]
 exclude = ["^backend/alembic/"]
 
 [tool.pytest.ini_options]
-testpaths = ["backend/tests"]
+testpaths = ["backend/tests", "pipeline/tests"]
