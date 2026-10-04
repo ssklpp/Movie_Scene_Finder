@@ -1,4 +1,7 @@
-"""HTTP 외 외부 호출(Qdrant 등)용 재시도: 지수 백오프, 최대 3회 (SPEC §0.4)."""
+"""외부 호출(Qdrant 등) 재시도: 지수 백오프, 최대 3회 (SPEC §0.4).
+
+파이프라인의 HTTP(httpx) 호출은 `pipeline.common.http.get`을 쓴다.
+"""
 
 import logging
 import time

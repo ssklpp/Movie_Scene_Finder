@@ -1,8 +1,8 @@
 import pytest
 
+from app.core.retry import retry
 from app.db.models import Movie
 from app.search.qdrant import decade_key
-from pipeline.common.retry import retry
 from pipeline.s08_upload import batches, movie_payload, next_version, point_id, stale_versions
 
 

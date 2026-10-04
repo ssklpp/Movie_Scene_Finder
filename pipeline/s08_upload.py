@@ -26,6 +26,7 @@ from sqlalchemy import func, select
 
 from app.core.config import get_settings
 from app.core.logging import setup_logging
+from app.core.retry import retry
 from app.db.models import Movie, Scene
 from app.db.session import SessionLocal
 from app.search.qdrant import (
@@ -38,7 +39,6 @@ from app.search.qdrant import (
     decade_key,
     get_qdrant,
 )
-from pipeline.common.retry import retry
 from pipeline.common.state import State
 from pipeline.s07_embed import MOVIES_PARQUET, SCENES_PARQUET
 
