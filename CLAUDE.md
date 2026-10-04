@@ -62,6 +62,9 @@ Python은 항상 `uv run`으로 실행한다(Python 3.12로 고정하고 시스�
   | 비용 | 0 | 100장 $0.030, 전체 3,852장 약 $1.2 |
 
   로컬 모델은 프롬프트 예시 문구("단발머리 소녀", "거인")를 실제 장면과 무관하게 베끼거나 단어가 깨지는("캐노eing") 문제가 있었다. gpt-6-luna는 추론 모델이라 `max_tokens`·`temperature`를 거부하므로 `reasoning_effort="low"`, `max_completion_tokens=2000`으로 호출한다(s04 `backend_config`). Batch API(반값)는 비용 차이가 작아 구현하지 않았다. 비교 결과 파일은 `reports/captions_cmp_*.jsonl`(git 제외)이다.
+- 전체 캡셔닝 결과(2026-10-04): 3,852장 모두 `gpt-6-luna-p1`, 총 약 $1.1, 약 1시간. 계정 `gpt-6-luna` 한도가 **TPM 20만**이고 OpenAI는 "입력 + max_completion_tokens"를 미리 차감하므로, s04·s05는 동시 요청 3개, `max_completion_tokens=1200`을 쓴다(8개·2,000일 때 9%가 429로 실패했다).
+- s05 검증: 실패 7장(0.18%, 목표 < 2%). 모두 알려진 오탐이다. 마이클(936075)의 "마이크"(출연진 이름 일부 = 마이크), 에이리언(348)의 "Alien"(영어 제목 = 외계인). 실패 장면도 캡션은 DB에 남아 있고, 재시도에서 규칙을 통과한 캡션만 덮어쓴다. 한 글자 예명("비")은 날씨와 겹쳐 검사에서 뺐다.
+- 사람 검수(무작위 50장, `s05 --seed 0`, 2026-10-04): **환각 0건**, **홍보·합성 이미지 20장(40%)**. 홍보 이미지(정면 포즈, 단색 배경, 콜라주)의 캡션은 사용자가 기억하는 장면과 잘 맞지 않으므로, Phase 3 평가에서 이 이미지를 빼거나 가중치를 낮췄을 때 검색이 나아지는지 확인한다. 검수 파일은 `reports/caption_review.csv`(git 제외)다.
 - 로컬 VLM은 E2 재실험용으로 남겨 둔다. `scripts/run_vlm.sh`로 띄운다(vLLM은 프로젝트 venv가 아닌 `~/.venvs/vllm`, vllm 0.30.0). 시작에 약 100초 걸린다.
   - 모델은 SPEC의 원본 `Qwen/Qwen3-VL-4B-Instruct`가 아니라 **AWQ 4비트 양자화본 `cyankiwi/Qwen3-VL-4B-Instruct-AWQ-4bit`**다. 원본(8.9GB)은 VRAM에 안 들어가고, 공식 FP8(5.7GiB)은 최대 길이 3,072로 줄여야 했으며 시작 중 WSL이 재시작됐다. AWQ 4비트는 SPEC 설정(4,096, 0.85) 그대로 뜨고 KV 캐시 1.89GiB가 남는다. 캡션 1장 약 1~2초, 입력 약 930토큰.
   - Windows 화면 표시가 VRAM을 쓴다. 브라우저·Discord·Steam 등을 끄면 약 0.5GB가 늘어난다.
