@@ -1,0 +1,4 @@
+# E7: text-embedding-3-small dimensions=512 (장면·줄거리 모두).
+experiment: E7
+name: dim_512
+index: {embed_dim: 512}

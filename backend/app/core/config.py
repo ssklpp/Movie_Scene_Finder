@@ -41,6 +41,7 @@ class Settings(BaseSettings):
     qdrant_url: str = "http://localhost:6333"
     qdrant_api_key: str = ""
     qdrant_scenes_alias: str = "scenes"
+    qdrant_movies_collection: str = "movies"
     r2_account_id: str = ""
     r2_access_key_id: str = ""
     r2_secret_access_key: str = ""

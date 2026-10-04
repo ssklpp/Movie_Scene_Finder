@@ -1,0 +1,4 @@
+# E4: sparse 토크나이저 비교 (SPEC §11, MeCab-ko 제외). 운영과 같은 Kiwi + 사용자 사전.
+experiment: E4
+name: kiwi_dict
+index: {tokenizer: kiwi_dict}

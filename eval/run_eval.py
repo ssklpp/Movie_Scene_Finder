@@ -50,6 +50,7 @@ from app.search.filters import MovieAttrs
 from app.search.hybrid import Mode, retrieve
 from app.search.qdrant import decade_key
 from eval.simulator import simulated_answer
+from eval.variants import IndexVariant, activate
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +74,8 @@ class EvalConfig(BaseModel):
     confidence_threshold: float | None = None  # 에이전트 모드만
     rewrite_reasoning_effort: ReasoningEffort | None = None  # 에이전트 모드만
     verify_reasoning_effort: ReasoningEffort | None = None  # 에이전트 모드만
+    # 실험용 색인 변형(E3·E4·E7). 있으면 로컬 Qdrant의 exp_* 컬렉션으로 검색한다(eval/variants.py).
+    index: IndexVariant | None = None
 
 
 @dataclass(frozen=True)
@@ -224,6 +227,15 @@ def clarify_stats(results: Sequence[QueryResult]) -> tuple[float | None, float]:
 def apply_overrides(cfg: EvalConfig) -> None:
     """에이전트가 읽는 설정(.env)을 실험 설정으로 덮어쓴다(이 프로세스 안에서만)."""
     settings = get_settings()
+    # 집계 가중치: 검색만 평가할 때는 aggregate()에 직접 넘기지만, 에이전트는 설정을 읽는다.
+    if cfg.w_second_scene is not None:
+        settings.w_second_scene = cfg.w_second_scene
+    if cfg.w_plot is not None:
+        settings.w_plot = cfg.w_plot
+    if cfg.soft_filter_boost is not None:
+        settings.soft_filter_boost = cfg.soft_filter_boost
+    if cfg.movie_topk is not None:
+        settings.movie_topk = cfg.movie_topk
     if cfg.max_clarify_turns is not None:
         settings.max_clarify_turns = cfg.max_clarify_turns
     if cfg.confidence_threshold is not None:
@@ -329,6 +341,8 @@ def main() -> None:
     if cfg.agent == args.no_agent:
         raise SystemExit(f"config agent={cfg.agent}: use --no-agent only with agent: false")
     apply_overrides(cfg)
+    if cfg.index is not None:
+        activate(cfg.index)
 
     examples = load_examples(args.split, args.datasets.split(","))[: args.limit]
     with SessionLocal() as session:

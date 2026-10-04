@@ -1,0 +1,4 @@
+# E4: 어절별 문자 2-gram.
+experiment: E4
+name: char2
+index: {tokenizer: char2}

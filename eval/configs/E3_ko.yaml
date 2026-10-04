@@ -1,0 +1,5 @@
+# E3: 검색 문서 언어 비교 (SPEC §11). 로컬 Qdrant 변형 색인(eval/variants.py)으로 검색만 평가.
+# 기준(ko)도 같은 방식으로 만든 exp_* 색인을 써서 조건을 맞춘다.
+experiment: E3
+name: caption_ko
+index: {doc_lang: ko}

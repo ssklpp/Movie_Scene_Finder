@@ -1,0 +1,4 @@
+# E3: 캡션을 caption_en으로 바꾼 검색 문서. 장소·물건·장르·연대는 한국어 그대로.
+experiment: E3
+name: caption_en
+index: {doc_lang: en}

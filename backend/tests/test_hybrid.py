@@ -5,9 +5,9 @@ import pytest
 from qdrant_client import QdrantClient
 from qdrant_client import models as qm
 
+from app.core.config import get_settings
 from app.core.llm import CallStats
 from app.search import hybrid
-from app.search.qdrant import MOVIES_COLLECTION
 from app.search.sparse import SparseVector
 
 VECTORS = hybrid.QueryVectors(dense=[0.1, 0.2], sparse=SparseVector([7, 9], [1.0, 1.0]))
@@ -81,7 +81,9 @@ def test_search_plots_uses_movies_collection_and_top20() -> None:
     fake = FakeQdrant([_point(0.5, movie_id=13, country="KR")])
     [hit] = hybrid.search_plots(VECTORS, client=cast(QdrantClient, fake))
     call = fake.calls[0]
-    assert call["collection_name"] == MOVIES_COLLECTION and call["limit"] == 20
+    assert (
+        call["collection_name"] == get_settings().qdrant_movies_collection and call["limit"] == 20
+    )
     assert [p.using for p in call["prefetch"]] == ["plot_dense", "plot_sparse_ko"]
     assert hit.movie_id == 13
 

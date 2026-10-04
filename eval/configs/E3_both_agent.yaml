@@ -1,0 +1,5 @@
+# E3 에이전트 버전: 질의 재작성·검증·재질문(최대 2회)을 거친 결과로 검색 문서 언어 비교.
+experiment: E3
+name: caption_both_agent
+agent: true
+index: {doc_lang: both}

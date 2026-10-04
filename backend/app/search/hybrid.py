@@ -24,7 +24,6 @@ from app.core.retry import retry
 from app.search import sparse
 from app.search.filters import MovieAttrs, to_qdrant_filter
 from app.search.qdrant import (
-    MOVIES_COLLECTION,
     PLOT_DENSE,
     PLOT_SPARSE,
     SCENE_DENSE,
@@ -151,7 +150,8 @@ def search_plots(
     prefetch = build_prefetch(
         vectors, PLOT_DENSE, PLOT_SPARSE, mode, to_qdrant_filter(hard_filters)
     )
-    points = _fused_query(client or get_qdrant(), MOVIES_COLLECTION, prefetch, limit)
+    collection = get_settings().qdrant_movies_collection
+    points = _fused_query(client or get_qdrant(), collection, prefetch, limit)
     return [
         PlotHit(
             movie_id=p.payload["movie_id"],

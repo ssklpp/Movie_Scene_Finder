@@ -1,0 +1,4 @@
+# E4: 사용자 사전 없는 Kiwi.
+experiment: E4
+name: kiwi
+index: {tokenizer: kiwi}

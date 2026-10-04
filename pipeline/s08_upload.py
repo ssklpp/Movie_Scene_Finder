@@ -38,7 +38,6 @@ from app.core.retry import retry
 from app.db.models import Movie, Scene
 from app.db.session import SessionLocal
 from app.search.qdrant import (
-    MOVIES_COLLECTION,
     PLOT_DENSE,
     PLOT_SPARSE,
     SCENE_DENSE,
@@ -310,11 +309,12 @@ def upload_vectors(args: argparse.Namespace, settings: Settings) -> None:
     logger.info("alias %s -> %s", alias, collection)
 
     plots = movie_points(movies, limit_ids)
-    if MOVIES_COLLECTION in names:
-        retry(lambda: client.delete_collection(MOVIES_COLLECTION), "delete movies")
-    create_collection(client, MOVIES_COLLECTION, PLOT_DENSE, PLOT_SPARSE, dim)
-    upsert_points(client, MOVIES_COLLECTION, plots)
-    logger.info("%s: %d movie points", MOVIES_COLLECTION, len(plots))
+    movies_collection = settings.qdrant_movies_collection
+    if movies_collection in names:
+        retry(lambda: client.delete_collection(movies_collection), "delete movies")
+    create_collection(client, movies_collection, PLOT_DENSE, PLOT_SPARSE, dim)
+    upsert_points(client, movies_collection, plots)
+    logger.info("%s: %d movie points", movies_collection, len(plots))
 
     names = [c.name for c in client.get_collections().collections]
     for old in stale_versions(names, args.keep):

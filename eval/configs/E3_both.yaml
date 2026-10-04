@@ -1,0 +1,4 @@
+# E3: caption_ko + caption_en을 함께 넣은 검색 문서.
+experiment: E3
+name: caption_both
+index: {doc_lang: both}

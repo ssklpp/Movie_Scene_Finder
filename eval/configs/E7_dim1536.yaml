@@ -1,0 +1,4 @@
+# E7: 임베딩 차원 비교 (SPEC §11). 운영과 같은 1536차원.
+experiment: E7
+name: dim_1536
+index: {embed_dim: 1536}

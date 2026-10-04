@@ -1,0 +1,5 @@
+# E5 에이전트 버전: 질의 재작성·검증·재질문(최대 2회)을 거친 결과로 W_PLOT 비교.
+experiment: E5
+name: wplot_0.5_agent
+agent: true
+w_plot: 0.5

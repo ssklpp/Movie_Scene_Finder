@@ -7,7 +7,6 @@ from qdrant_client import QdrantClient
 from app.core.config import get_settings
 
 SCENES_COLLECTION_PREFIX = "scenes_v"  # 실제 컬렉션은 scenes_v{n}, 검색은 별칭(QDRANT_SCENES_ALIAS)
-MOVIES_COLLECTION = "movies"
 
 SCENE_DENSE = "dense"
 SCENE_SPARSE = "sparse_ko"
