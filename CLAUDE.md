@@ -11,7 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   - Phase 2 결과: 캡션 3,852장(gpt-6-luna), 검증 실패 0.18%, 검수 50장 환각 0건, 로컬 Qdrant `scenes`(→ `scenes_v2`) 3,852 포인트 = scenes 행 수, `movies` 299 포인트.
   - Phase 3 결과: `search/filters.py`·`hybrid.py`·`aggregate.py`, synthetic 300개, `eval/run_eval.py`·`report.py`, E1 결과표(아래 구현 메모). hybrid가 dev에서 dense보다 나음을 확인했다.
   - Phase 4 결과: `search/confidence.py`·`clarify.py`, `agent/`(LangGraph, PostgresSaver), API(SSE·재개·피드백·rate limit), 재질문 시뮬레이터, E6 결과표(아래 구현 메모). curl 시나리오 1과 서버 재시작 후 재개를 실제 서버로 확인했다.
-  - Phase 5에 남은 것: 프론트엔드(§10: 검색·재질문·결과 화면, 이미지 업로드), 배포(Railway·Qdrant Cloud·Vercel, CORS), R2 썸네일(s08 업로드와 thumb_url), 사용자 사전·bm25_stats를 backend 배포에 포함하는 방법. **지연시간(요청 p95 약 10초, SPEC 목표 8초)** 개선 과제도 남아 있다.
+  - Phase 5 진행: 프론트엔드 완료, 배포 준비(Dockerfile·사용자 사전 포함·DB 주소 정규화·카탈로그 복사) 완료, Qdrant Cloud 적재와 Railway Postgres 카탈로그 복사 완료. 남은 것: Railway backend 서비스, Vercel, CORS, R2 썸네일(s08 업로드와 thumb_url), 배포 환경 지연시간 측정. 요청 p95는 로컬 순차 8.5초(SPEC 목표 8초)다.
   - 원격 저장소: https://github.com/ssklpp/Movie_Scene_Finder. Phase 완료 기준(§12)을 통과하면 이 항목을 갱신한다.
 - 현재 Phase의 완료 기준을 통과하기 전에는 다음 Phase 코드를 만들지 않는다.
 - 저장소는 WSL 홈(`~/projects/movie-scene-finder`)에 있다. 모든 명령은 WSL2 셸에서 실행한다(`/mnt/c/...`나 Windows 쪽 Python·Node는 쓰지 않는다).
@@ -53,7 +53,7 @@ Python은 항상 `uv run`으로 실행한다(Python 3.12로 고정하고 시스�
 - 마이그레이션은 모델을 바꾼 뒤 `cd backend && uv run alembic revision --autogenerate -m "..."`로 만들고, 생성 파일을 검토한다.
 - 프론트엔드는 Next.js 16이다. 코드를 쓰기 전에 `frontend/AGENTS.md`의 지시대로 `frontend/node_modules/next/dist/docs/`의 관련 문서를 먼저 읽는다.
 - s02는 backdrop만 받는다(TMDB 영화에는 still이 없다). s03의 pHash 중복 기준은 SPEC의 8이 아니라 **20**이다. backdrop에 자르기·확대·색 보정 사본이 많아 8로는 거의 걸러지지 않았다(4,446장 → 8: 4,242행, 20: 3,852행). backdrop 중 홍보용 포스터 이미지가 많으니 Phase 2 s05 검수에서 비율을 확인한다.
-- Kiwi 사용자 사전은 `uv run python -m pipeline.build_user_dict`로 만든다(`pipeline/data/user_dict.txt`, 제목 + 영화별 주요 배우 10명·감독의 한글 이름). 띄어 쓴 제목과 배역 이름(영어)은 넣지 않는다. 이 파일은 git에서 빠지지만 backend 질의 토큰화에도 필요하므로, Phase 5 배포 때 전달 방법을 정해야 한다. `kiwipiepy`는 타입 정보가 없어 mypy override로 제외했다.
+- Kiwi 사용자 사전은 `uv run python -m pipeline.build_user_dict`로 만든다(`backend/app/search/data/user_dict.txt`, 저장소에 포함. 제목 + 영화별 주요 배우 10명·감독의 한글 이름). 띄어 쓴 제목과 배역 이름(영어)은 넣지 않는다. `kiwipiepy`는 타입 정보가 없어 mypy override로 제외했다.
 - human 골든셋: 지인 입력 `eval/datasets/human_v1.csv`(안내문 `eval/human_guide.md`, 영화 목록 `movie_list_v1.csv`)를 `uv run python -m eval.human_dataset build`로 `human_v1.jsonl`로 바꾼다. 레코드에는 SPEC 필드 `answer_movie_id`(movies.id) 외에 `answer_tmdb_id`도 있다. DB를 새로 만들면 movies.id가 바뀔 수 있으니 평가 시 정답은 `answer_tmdb_id` 기준으로 맞춘다.
 - **캡션 모델은 `gpt-6-luna`로 결정했다(2026-10-04, `CAPTION_BACKEND=openai`, model_version `gpt-6-luna-p1`).** 같은 무작위 100장(`s04 --sample 100 --seed 0`)으로 로컬 AWQ 4비트와 비교한 결과이며, SPEC E2(캡션 모델 비교)의 결과로 쓴다.
 
@@ -99,6 +99,14 @@ Python은 항상 `uv run`으로 실행한다(Python 3.12로 고정하고 시스�
   - 디자인: 밝은 차가운 회색 바탕에 2.39:1 "영화 화면" 하나, 입력은 그 화면 아래의 자막(노란 글자 + 검은 테두리). 포인트 색은 자막 노랑 `#F3E36B` 하나이고 자막과 캡션 강조에만 쓴다. 글꼴은 제목 Song Myung, 본문 IBM Plex Sans KR. 토큰은 `globals.css`의 `@theme`.
   - 화면 확인: WSL에는 Chromium 실행 라이브러리가 없어(sudo 필요) Windows의 Node + `playwright-core` + Edge(`channel: "msedge"`)로 `localhost:3000`을 캡처했다(스크립트는 저장소 밖). 포스터는 지연 로딩이라 스크롤해야 찍힌다.
   - 근거 장면 썸네일(`thumb_url`)은 R2를 붙이기 전까지 null이라 캡션만 보인다.
+- 배포 준비(Phase 5):
+  - **Kiwi 사용자 사전은 `backend/app/search/data/user_dict.txt`(저장소에 포함)**다. 배포된 backend도 질의 토큰화에 같은 사전을 써야 하고 `pipeline/data/`는 배포되지 않기 때문이다. `pipeline.build_user_dict`가 이 파일에 쓴다. 사전을 바꾸면 s07·s08을 다시 돌린다.
+  - `bm25_stats.json`(avgdl)은 문서 쪽 가중치에만 쓰인다. 질의 값이 1.0이라 backend는 읽지 않으므로 배포에 필요 없다(SPEC의 "backend가 읽는다"는 실제로 쓰이지 않는다).
+  - `backend/Dockerfile`(빌드 컨텍스트는 저장소 루트): 2단계 빌드로 backend 의존성만 설치하고 uv와 캐시를 최종 이미지에서 뺐다(1.99GB → 805MB). 시작 시 `alembic upgrade head` 후 uvicorn, 포트는 `PORT`. `railway.json`이 Dockerfile 경로와 `/health` 헬스체크를 정한다.
+  - `DATABASE_URL`은 `postgres://`·`postgresql://`도 받아 `postgresql+psycopg://`로 바꾼다(Railway 형식).
+  - uvicorn은 `--proxy-headers --forwarded-allow-ips='*'`로 `X-Forwarded-For`의 IP를 쓴다. 없으면 플랫폼 프록시 IP 하나로 모든 사용자의 rate limit이 묶인다. 대신 클라이언트가 이 헤더를 꾸미면 제한을 피할 수 있다(Railway 프록시 대역을 알면 그 대역만 믿도록 좁힌다). OpenAI 월 예산 한도가 최종 안전장치다.
+  - 배포 DB에는 스키마만 생기므로 `scripts/copy_catalog.sh <배포 DATABASE_URL> [--replace]`로 로컬의 movies·scenes를 복사한다. 로컬에서 접속하려면 Railway Postgres의 Public Access(TCP 프록시)를 잠깐 켜고 `DATABASE_PUBLIC_URL`을 쓴 뒤 다시 끈다. backend는 내부 주소(`${{Postgres.DATABASE_URL}}`)를 쓴다.
+  - 진행(2026-10-04): Qdrant Cloud에 s08로 `scenes_v1` 3,852 + `movies` 299 포인트 적재(검색 1회 약 0.7초). Railway Postgres(SPEC은 16이지만 Railway 기본 **18.6**, 쓰는 기능은 같다)에 스키마를 만들고 movies 300·scenes 3,852행을 복사했다. s08 완료 기록은 Qdrant 주소별로 남으므로 로컬과 클라우드에 각각 적재할 수 있다.
 - 체크포인트 상태의 pydantic 모델은 `agent/state.py`의 `STATE_MODELS`에 등록해야 복원된다(`checkpoint.make_serde`). 새 모델을 상태에 넣으면 여기에도 추가한다.
 - 실제 실행 관찰(2026-10-04): 질의당 비용 약 $0.0006(재질문 2회 세션 약 $0.0018). **지연시간이 SPEC 목표를 넘는다**: verify 1회 약 7초, rewrite 1.5~3초 → 첫 응답 약 10초, 재질문마다 7~10초 추가. 서버 재시작 후 재개(새 연결·새 그래프)는 동작을 확인했다. 기생충 "물난리" 질의처럼 수집 이미지와 줄거리에 없는 장면은 재질문 후에도 후보에 들지 않는다.
 - 로컬 VLM은 E2 재실험용으로 남겨 둔다. `scripts/run_vlm.sh`로 띄운다(vLLM은 프로젝트 venv가 아닌 `~/.venvs/vllm`, vllm 0.30.0). 시작에 약 100초 걸린다.
