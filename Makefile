@@ -26,8 +26,9 @@ dev:
 	pnpm -C frontend dev --port 3000 & \
 	wait
 
+# build_user_dict는 s07(sparse 토큰화)보다 먼저 돌아야 한다.
 index:
-	for s in s01_collect_meta s02_collect_images s03_dedup s04_caption \
+	for s in s01_collect_meta s02_collect_images s03_dedup build_user_dict s04_caption \
 	         s05_validate s06_build_docs s07_embed s08_upload; do \
 		uv run python -m pipeline.$$s $(LIMIT_ARG) || exit 1; \
 	done
