@@ -1,6 +1,7 @@
 """s06: 장면마다 검색 문서를 만들어 `pipeline/data/search_docs.jsonl`에 쓴다 (SPEC §6).
 
-검색 문서 = caption_ko + setting + objects + 장르·연대. 영화 제목은 넣지 않는다. 화면 속 글자
+검색 문서 = caption_ko + caption_en + setting + objects + 장르·연대. 영어 캡션은 E3(dev)에서
+검색만 평가 R@1 0.205 → 0.255로 나아져 넣었다. 영화 제목은 넣지 않는다. 화면 속 글자
 (text_in_frame)도 제목 로고가 들어 있을 수 있어 넣지 않는다.
 
 계산만 하는 단계라 매번 파일 전체를 새로 쓴다(같은 입력이면 같은 결과). s07이 이 파일을 읽는다.
@@ -31,9 +32,15 @@ def decade_label(year: int | None) -> str | None:
 
 
 def build_search_text(
-    caption_ko: str, tags: dict[str, Any], genres: Sequence[str] | None, year: int | None
+    caption_ko: str,
+    tags: dict[str, Any],
+    genres: Sequence[str] | None,
+    year: int | None,
+    caption_en: str | None = None,
 ) -> str:
     parts = [caption_ko.strip()]
+    if en := (caption_en or "").strip():
+        parts.append(en)
     if setting := (tags.get("setting") or "").strip():
         parts.append(f"장소: {setting}")
     if objects := [o.strip() for o in tags.get("objects") or [] if o.strip()]:
@@ -60,6 +67,7 @@ def main() -> None:
                 Scene.movie_id,
                 Movie.tmdb_id,
                 Scene.caption_ko,
+                Scene.caption_en,
                 Scene.tags,
                 Scene.model_version,
                 Movie.genres,
@@ -75,7 +83,8 @@ def main() -> None:
     SEARCH_DOCS_PATH.parent.mkdir(parents=True, exist_ok=True)
     tmp = SEARCH_DOCS_PATH.with_suffix(".part")
     with tmp.open("w", encoding="utf-8") as f:
-        for scene_id, movie_id, tmdb_id, caption_ko, tags, version, genres, year in rows:
+        for row in rows:
+            scene_id, movie_id, tmdb_id, caption_ko, caption_en, tags, version, genres, year = row
             if not caption_ko or tags is None or version != model_version:
                 skipped += 1
                 continue
@@ -84,7 +93,7 @@ def main() -> None:
                 "movie_id": movie_id,
                 "tmdb_id": tmdb_id,
                 "model_version": version,
-                "search_text": build_search_text(caption_ko, tags, genres, year),
+                "search_text": build_search_text(caption_ko, tags, genres, year, caption_en),
             }
             f.write(json.dumps(doc, ensure_ascii=False) + "\n")
             written += 1

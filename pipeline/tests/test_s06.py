@@ -33,3 +33,10 @@ def test_build_search_text_excludes_text_in_frame_and_title() -> None:
 
 def test_build_search_text_skips_missing_fields() -> None:
     assert build_search_text(" 캡션 ", {}, [], None) == "캡션"
+
+
+def test_build_search_text_adds_english_caption_after_korean() -> None:
+    text = build_search_text("가족이 피자 상자를 접는다.", {}, None, None, " A family. ")
+    assert text == "가족이 피자 상자를 접는다.\nA family."
+    # 영어 캡션이 비어 있으면 한국어만
+    assert build_search_text("캡션", {}, None, None, "  ") == "캡션"
