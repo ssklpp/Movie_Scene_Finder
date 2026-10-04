@@ -7,6 +7,7 @@ from langgraph.checkpoint.postgres import PostgresSaver
 from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
 from psycopg import Connection
 from psycopg.rows import DictRow, dict_row
+from psycopg_pool import ConnectionPool
 
 from app.agent.state import STATE_MODELS
 from app.core.config import get_settings
@@ -22,6 +23,19 @@ def make_serde() -> JsonPlusSerializer:
 def psycopg_url(sqlalchemy_url: str) -> str:
     """SQLAlchemy URL(postgresql+psycopg://)을 psycopg가 받는 형식(postgresql://)으로."""
     return sqlalchemy_url.replace("postgresql+psycopg://", "postgresql://", 1)
+
+
+def pooled_checkpointer() -> tuple[PostgresSaver, ConnectionPool[Connection[DictRow]]]:
+    """API 서버용: 동시 요청을 위해 연결 풀을 쓴다. 풀은 호출한 쪽이 닫는다."""
+    pool: ConnectionPool[Connection[DictRow]] = ConnectionPool(
+        psycopg_url(get_settings().database_url),
+        kwargs={"autocommit": True, "prepare_threshold": 0, "row_factory": dict_row},
+        max_size=10,
+        open=True,
+    )
+    saver = PostgresSaver(pool, serde=make_serde())
+    saver.setup()
+    return saver, pool
 
 
 @contextmanager

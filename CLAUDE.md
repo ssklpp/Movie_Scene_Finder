@@ -86,6 +86,7 @@ Python은 항상 `uv run`으로 실행한다(Python 3.12로 고정하고 시스�
   - 캡션 스키마·프롬프트는 `search/caption.py`에 있다(색인 s04와 이미지 질의가 같은 프롬프트를 쓴다).
   - rewrite의 soft_filters는 OpenAI strict 구조화 출력이 자유 키 dict를 받지 않아 고정 필드(`SoftFilterFields`)로 받고, 형식이 틀린 값은 코드에서 버린다.
   - verify 입력에 후보의 제목·연도를 준다(LLM의 영화 지식 활용). 대신 "제목 글자로 점수를 올리지 말 것", "흔한 장면이면 0.5 이하"를 프롬프트에 넣었다. 넣기 전에는 "누군가를 쫓아가는 장면"에 "추격자"를 0.88로 과신했다.
+- API(§9): `agent/runtime.py`가 그래프를 돌려 SSE 이벤트를 만들고 세션을 기록한다(FastAPI 없이 테스트 가능). 서버는 시작할 때 Postgres 연결 풀 체크포인터로 그래프를 한 번 만든다(`main.py` lifespan). `question` 이벤트에는 SPEC 필드 외에 화면용 `labels`가 있다. `sessions.latency_ms`는 노드 처리 시간 합(사용자가 답을 기다린 시간 제외). rate limit은 `/search`만 센다. 테스트는 `app.state.runtime`에 메모리 체크포인터 실행기를 넣고 TestClient를 `with` 없이 써서 lifespan을 건너뛴다. DB 테스트는 Postgres가 없으면 skip되고 CI는 Postgres 서비스로 돌린다.
 - 체크포인트 상태의 pydantic 모델은 `agent/state.py`의 `STATE_MODELS`에 등록해야 복원된다(`checkpoint.make_serde`). 새 모델을 상태에 넣으면 여기에도 추가한다.
 - 실제 실행 관찰(2026-10-04): 질의당 비용 약 $0.0006(재질문 2회 세션 약 $0.0018). **지연시간이 SPEC 목표를 넘는다**: verify 1회 약 7초, rewrite 1.5~3초 → 첫 응답 약 10초, 재질문마다 7~10초 추가. 서버 재시작 후 재개(새 연결·새 그래프)는 동작을 확인했다. 기생충 "물난리" 질의처럼 수집 이미지와 줄거리에 없는 장면은 재질문 후에도 후보에 들지 않는다.
 - 로컬 VLM은 E2 재실험용으로 남겨 둔다. `scripts/run_vlm.sh`로 띄운다(vLLM은 프로젝트 venv가 아닌 `~/.venvs/vllm`, vllm 0.30.0). 시작에 약 100초 걸린다.
