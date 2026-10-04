@@ -95,6 +95,10 @@ Python은 항상 `uv run`으로 실행한다(Python 3.12로 고정하고 시스�
   - 이어서 **재질문 문장을 속성별 고정 문장(`search/clarify.py`의 `QUESTIONS`)으로 바꿨다**(사용자 결정, SPEC §7.6 "질문 문장은 LLM이 생성"과 다름). 재질문 요청마다 1.2~2.5초가 줄었다. `ask` 노드는 LLM 없이 질문만 만들고, 재개 시 같은 질문이 유지되도록 `clarify`와 나눈 구조는 유지한다.
   - 결과(순차): 요청 중간값 6.4초, p95 8.5초(요청 23회라 ±0.5초 흔들림), 최대 8.8초. 남은 시간은 verify 4.6초 + rewrite 2.1초다. rewrite는 추론 토큰이 이미 0이라 `reasoning_effort="none"`의 효과가 없다.
   - 남은 후보: verify에 `reasoning_effort="none"`(추론 약 144토큰, 약 1.5초 단축 예상, 판단 품질 위험, SPEC "low"와 다름. gpt-6-luna는 `minimal`은 거부하고 `none`은 받는다). Phase 6에서 E6을 여러 번 돌려 품질을 비교한 뒤 정한다.
+- 프런트엔드(`frontend/app/`, Next.js 16): `components/SceneSearch.tsx`가 상태(검색 → 진행 단계 → 재질문 → 결과)를 관리하고, `lib/api.ts`가 POST SSE를 `fetch` 스트림으로 읽는다(`EventSource`는 GET만 지원). API 주소는 `NEXT_PUBLIC_API_URL`(`frontend/.env.example`), backend는 `CORS_ORIGINS`로 허용한다.
+  - 디자인: 밝은 차가운 회색 바탕에 2.39:1 "영화 화면" 하나, 입력은 그 화면 아래의 자막(노란 글자 + 검은 테두리). 포인트 색은 자막 노랑 `#F3E36B` 하나이고 자막과 캡션 강조에만 쓴다. 글꼴은 제목 Song Myung, 본문 IBM Plex Sans KR. 토큰은 `globals.css`의 `@theme`.
+  - 화면 확인: WSL에는 Chromium 실행 라이브러리가 없어(sudo 필요) Windows의 Node + `playwright-core` + Edge(`channel: "msedge"`)로 `localhost:3000`을 캡처했다(스크립트는 저장소 밖). 포스터는 지연 로딩이라 스크롤해야 찍힌다.
+  - 근거 장면 썸네일(`thumb_url`)은 R2를 붙이기 전까지 null이라 캡션만 보인다.
 - 체크포인트 상태의 pydantic 모델은 `agent/state.py`의 `STATE_MODELS`에 등록해야 복원된다(`checkpoint.make_serde`). 새 모델을 상태에 넣으면 여기에도 추가한다.
 - 실제 실행 관찰(2026-10-04): 질의당 비용 약 $0.0006(재질문 2회 세션 약 $0.0018). **지연시간이 SPEC 목표를 넘는다**: verify 1회 약 7초, rewrite 1.5~3초 → 첫 응답 약 10초, 재질문마다 7~10초 추가. 서버 재시작 후 재개(새 연결·새 그래프)는 동작을 확인했다. 기생충 "물난리" 질의처럼 수집 이미지와 줄거리에 없는 장면은 재질문 후에도 후보에 들지 않는다.
 - 로컬 VLM은 E2 재실험용으로 남겨 둔다. `scripts/run_vlm.sh`로 띄운다(vLLM은 프로젝트 venv가 아닌 `~/.venvs/vllm`, vllm 0.30.0). 시작에 약 100초 걸린다.

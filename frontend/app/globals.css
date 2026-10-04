@@ -1,26 +1,72 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/*
+ * 장면 기억 검색기 토큰.
+ * 밝은 차가운 회색 바탕 위에 어두운 청회색 "영화 화면" 하나를 두고, 포인트 색은 한국 영화 자막의
+ * 노란색 하나만 쓴다. 자막 노랑은 사용자가 적는 기억(자막)과 그 기억이 맞은 곳(강조)에만 쓴다.
+ */
+@theme {
+  --color-paper: #e7eaee;
+  --color-ink: #1d2533;
+  --color-muted: #667386;
+  --color-screen: #2b3444;
+  --color-screen-edge: #1f2632;
+  --color-subtitle: #f3e36b;
+  --color-line: #c9cfd7;
+
+  --font-display: var(--font-song-myung), "Nanum Myeongjo", serif;
+  --font-sans: var(--font-plex-kr), "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  background: var(--color-paper);
+  color: var(--color-ink);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+  word-break: keep-all;
+}
+
+/* 자막: 화면 위에서도 읽히도록 검은 테두리를 두른 노란 글자 */
+.subtitle-text {
+  color: var(--color-subtitle);
+  text-shadow:
+    -1px -1px 0 #000,
+    1px -1px 0 #000,
+    -1px 1px 0 #000,
+    1px 1px 0 #000,
+    0 2px 6px rgb(0 0 0 / 0.5);
+}
+
+.subtitle-text::placeholder {
+  color: rgb(243 227 107 / 0.45);
+  text-shadow: none;
+}
+
+/* 키보드로 움직일 때만 보이는 초점 표시 */
+:focus-visible {
+  outline: 3px solid var(--color-subtitle);
+  outline-offset: 2px;
+}
+
+/* 단계가 끝나는 순간 체크가 그려진다. 움직임을 줄인 환경에서는 바로 보인다. */
+@keyframes check-draw {
+  from {
+    stroke-dashoffset: 14;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.check-path {
+  stroke-dasharray: 14;
+  animation: check-draw 260ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .check-path {
+    animation: none;
+  }
 }

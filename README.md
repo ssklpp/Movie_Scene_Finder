@@ -2,7 +2,7 @@
 
 기억나는 영화 장면을 글이나 사진으로 설명하면 어떤 영화인지 찾아 주는 검색 서비스입니다.
 
-> **개발 중입니다.** 지금은 Phase 4(검색 에이전트와 API)까지 구현되어 있고, 화면과 배포는 아직 없습니다.
+> **개발 중입니다.** 검색 에이전트, API, 검색 화면까지 로컬에서 동작하고, 배포는 아직입니다.
 > 구현 순서와 상세 명세는 [SPEC.md](SPEC.md)를 따릅니다.
 
 ## 동작 방식
@@ -116,6 +116,16 @@ curl -N -X POST localhost:8000/search/<session_id>/answer \
 ```
 
 그 밖에 `POST /feedback`, `GET /movies/{id}`, `GET /health`가 있습니다([SPEC §9](SPEC.md)).
+
+### 검색 화면 (Phase 5)
+
+```bash
+cp frontend/.env.example frontend/.env.local   # NEXT_PUBLIC_API_URL
+make dev                                        # backend(:8000) + frontend(:3000)
+```
+
+브라우저에서 `http://localhost:3000`을 열고 기억나는 장면을 적거나 사진을 올립니다.
+진행 단계, 재질문 선택지, 결과(포스터, 추천 이유, 질의 단어가 강조된 근거 장면, "맞아요/아니에요")가 차례로 나옵니다.
 
 ### 평가
 
