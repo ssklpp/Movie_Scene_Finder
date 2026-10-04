@@ -8,6 +8,23 @@ on:
 jobs:
   python:
     runs-on: ubuntu-latest
+    services:
+      # DB가 필요한 테스트(sessions·feedback·movies API)용. 없으면 그 테스트는 건너뛴다.
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: app
+          POSTGRES_PASSWORD: app
+          POSTGRES_DB: msf
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U app -d msf"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
+    env:
+      DATABASE_URL: postgresql+psycopg://app:app@localhost:5432/msf
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
@@ -15,4 +32,5 @@ jobs:
       - run: uv run ruff check .
       - run: uv run ruff format --check .
       - run: uv run mypy backend pipeline
+      - run: cd backend && uv run alembic upgrade head
       - run: uv run pytest
