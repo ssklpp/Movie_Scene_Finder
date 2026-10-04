@@ -1,43 +1,26 @@
-"""재질문 (§7.6). LangGraph는 interrupt() 뒤 재개할 때 노드를 처음부터 다시 실행하므로,
-질문 문장을 만드는 LLM 호출(ask)과 답을 기다리는 interrupt(clarify)를 다른 노드로 나눈다.
+"""재질문 (§7.6).
+
+ask는 질문(속성별 고정 문장과 선택지)을 만들고, clarify는 interrupt()로 답을 기다려 반영한다.
+LangGraph는 재개할 때 interrupt가 있는 노드를 처음부터 다시 실행하므로, 질문을 만드는 일과
+기다리는 일을 다른 노드에 둔다(질문 문장을 LLM으로 만들던 때의 구조이며, 지금도 재개 시 같은
+질문이 유지되도록 그대로 둔다).
 """
 
 from typing import Any
 
 from langgraph.types import interrupt
 
-from app.agent.nodes.common import LLM_KWARGS, logger, timed
-from app.agent.prompts import question_messages
+from app.agent.nodes.common import timed
 from app.agent.state import Question, SearchState
-from app.core import llm
-from app.core.config import get_settings
-from app.search.clarify import ATTR_NAMES, FALLBACK_QUESTIONS, UNKNOWN, apply_answer
+from app.search.clarify import QUESTIONS, UNKNOWN, apply_answer
 
 
 @timed("ask")
 def ask(state: SearchState) -> SearchState:
     choice = state["clarify_choice"]
     assert choice is not None  # route_after_verify가 보장한다
-    text = FALLBACK_QUESTIONS[choice.attr]
-    cost = 0.0
-    try:
-        resp, stats = llm.chat(
-            question_messages(
-                ATTR_NAMES[choice.attr], [o.label for o in choice.options], state.get("query_text")
-            ),
-            model=get_settings().llm_model_default,
-            **LLM_KWARGS,
-        )
-        cost = stats.cost_usd
-        generated = (resp.choices[0].message.content or "").strip() if resp.choices else ""
-        if generated:
-            text = generated.splitlines()[0]
-    except Exception as e:
-        logger.warning("question generation failed, using fallback: %s", e)
-    return {
-        "pending_question": Question(attr=choice.attr, text=text, options=choice.options),
-        "cost_usd": cost,
-    }
+    question = Question(attr=choice.attr, text=QUESTIONS[choice.attr], options=choice.options)
+    return {"pending_question": question}
 
 
 def answer_value(question: Question, resume: Any) -> str:

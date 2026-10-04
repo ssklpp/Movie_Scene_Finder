@@ -19,7 +19,7 @@ from app.agent.state import Question
 from app.core.llm import CallStats
 from app.core.uploads import load_upload, save_upload
 from app.search.caption import People, SceneCaption
-from app.search.clarify import UNKNOWN, ClarifyOption
+from app.search.clarify import QUESTIONS, UNKNOWN, ClarifyOption
 from app.search.confidence import Verified, VerifyOutput
 from app.search.filters import MovieAttrs
 from app.search.hybrid import RetrievalResult, SceneHit
@@ -152,7 +152,7 @@ def test_low_confidence_clarify_resume_applies_hard_filter(
     out = graph.invoke(initial_state("s1", "물 차는 집", None), CFG)
     [intr] = out["__interrupt__"]
     q = intr.value
-    assert q["attr"] == "decade" and q["text"] == "언제쯤 개봉한 영화였나요?"
+    assert q["attr"] == "decade" and q["text"] == QUESTIONS["decade"]
     assert [o["value"] for o in q["options"]] == ["2010s", "2000s", UNKNOWN]
 
     out = graph.invoke(Command(resume="2010s"), CFG)
@@ -161,7 +161,7 @@ def test_low_confidence_clarify_resume_applies_hard_filter(
     assert out["hard_filters"] == {"decade": "2010s"}
     assert out["asked_attrs"] == ["decade"] and out["clarify_turns"] == 1
     assert [r.movie_id for r in out["result"]] == [1]
-    assert fakes.chat_calls == 1  # 재개해도 질문 생성(ask)은 다시 돌지 않는다
+    assert fakes.chat_calls == 0  # 질문 문장은 고정 문장이라 LLM을 부르지 않는다
 
 
 def test_stops_after_max_clarify_turns(

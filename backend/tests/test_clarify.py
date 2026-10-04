@@ -3,7 +3,7 @@ import math
 import pytest
 
 from app.search.clarify import (
-    FALLBACK_QUESTIONS,
+    QUESTIONS,
     UNKNOWN,
     apply_answer,
     attr_value,
@@ -119,4 +119,4 @@ def test_apply_answer() -> None:
 
 
 def test_fallback_question_for_every_attribute() -> None:
-    assert set(FALLBACK_QUESTIONS) == set(FILTER_KEYS)
+    assert set(QUESTIONS) == set(FILTER_KEYS)

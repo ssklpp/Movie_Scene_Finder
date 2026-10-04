@@ -42,7 +42,7 @@ Python은 항상 `uv run`으로 실행한다(Python 3.12로 고정하고 시스�
 - **sparse 토큰화 일치**: 인덱싱(s07)과 질의(backend)는 반드시 같은 `backend/app/search/sparse.py` 함수를 쓴다. BM25 `avgdl`은 s07이 `pipeline/data/bm25_stats.json`에 쓰고 backend가 읽는다. 한쪽만 바꾸면 검색이 조용히 망가진다.
 - **검색 문서에는 영화 제목을 넣지 않는다**(s06).
 - **필터 두 종류**: 사용자가 확신 없이 말한 조건은 `soft_filters`로 점수에 boost만 주고, 재질문으로 확정한 조건은 `hard_filters`로 두 prefetch에 payload 필터로 건다.
-- **재질문 속성은 코드가 엔트로피로 고른다**(§7.6). LLM은 질문 문장만 생성한다.
+- **재질문 속성은 코드가 엔트로피로 고른다**(§7.6). 질문 문장은 속성별 고정 문장이다(SPEC은 LLM 생성, 지연시간 때문에 바꿈. 아래 구현 메모).
 - 에이전트 상태는 `PostgresSaver`(thread_id = session_id)에 저장되므로 서버를 재시작해도 `interrupt()`에서 대기 중인 세션을 재개할 수 있어야 한다.
 
 ## 구현 메모
@@ -81,7 +81,7 @@ Python은 항상 `uv run`으로 실행한다(Python 3.12로 고정하고 시스�
 - **E1 결과(dev, synthetic 200, `--no-agent`, 2026-10-04)**: dense R@1 0.100 / R@5 0.235 / MRR 0.156, sparse 0.210 / 0.375 / 0.293, **hybrid 0.205 / 0.410 / 0.286**. p95 < 0.2초. hybrid가 dense 대비 약 2배이고 sparse와는 비슷하다. dense가 약한 이유는 파이프라인 문제가 아니다(저장 벡터·Qdrant·전수 계산 순위 일치를 확인했다). 많이 바꿔 쓴 구어체 질의에서 text-embedding-3-small의 원문 장면 유사도가 비슷한 다른 장면보다 낮다. 개선 후보: Phase 4 질의 재작성(rewrite), dense 모델, RRF k(Qdrant 기본은 1/(1+순위)), 홍보 이미지 제외. 이 실행은 평가 코드 커밋 전이라 `eval_runs`의 커밋 값(`9e4d7c4`)에 평가 코드가 없다.
 - test split(human 포함)은 SPEC대로 Phase 6 최종 측정 때 1회만 쓴다.
 - 에이전트(`app/agent/`)에서 SPEC과 다르게 정한 것(사용자 확인, 2026-10-04):
-  - SPEC의 clarify를 `ask`(질문 문장 LLM 생성)와 `clarify`(`interrupt()`·답 반영)로 나눴다. LangGraph는 재개할 때 interrupt가 있는 노드를 처음부터 다시 실행하므로, 한 노드에 두면 LLM이 다시 불리고 질문이 바뀐다.
+  - SPEC의 clarify를 `ask`(질문 만들기)와 `clarify`(`interrupt()`·답 반영)로 나눴다. LangGraph는 재개할 때 interrupt가 있는 노드를 처음부터 다시 실행하므로, 처음에 질문 문장을 LLM으로 만들 때 한 노드에 두면 LLM이 다시 불리고 질문이 바뀌었다. 지금은 질문이 고정 문장이지만 구조는 유지한다.
   - `langchain-openai`를 쓰지 않는다. 모든 LLM 호출은 `core/llm.py` 래퍼(비용 기록)를 거친다.
   - answer 노드는 LLM을 부르지 않고 verify의 `reason`을 추천 이유로 쓴다.
   - 캡션 스키마·프롬프트는 `search/caption.py`에 있다(색인 s04와 이미지 질의가 같은 프롬프트를 쓴다).
@@ -92,7 +92,9 @@ Python은 항상 `uv run`으로 실행한다(Python 3.12로 고정하고 시스�
 - **E6 결과(dev, synthetic 200, 시뮬레이터, 2026-10-04)**: turns0 R@1 0.815 / R@5 0.820 / MRR 0.818, turns1 0.825 / 0.840 / 0.832(평균 재질문 0.14, clarify_success 0.31), **turns2 0.860 / 0.875 / 0.867(평균 재질문 0.28, clarify_success 0.42)**. 요청 p95 10.2~11.1초, 질의당 $0.00065~0.00082(약 1원). 에이전트가 검색만 할 때(E1 hybrid R@1 0.205)보다 크게 낫다(재작성 + 영화 지식을 쓰는 검증). R@1과 R@5가 거의 같아, 못 찾는 질의는 대부분 정답이 후보 10편에 들지 않은 경우다. 이 실행의 커밋 값은 `ffc08d5-dirty`(평가 코드 커밋 전)다.
 - 지연시간(2026-10-04 측정, dev 20개 순차): 요청 1회의 75%가 verify이고 그 시간은 **출력 토큰 수**에 비례한다(초당 약 90~120토큰, 추론 토큰은 적다). 그래서 verify 출력에서 SPEC의 `evidence_scene_ids`를 뺐고(쓰는 곳이 없었다), reason은 점수 상위 5편만 50자 이내로 쓰게 했다. 서버 시작 때 `agent/warmup.py`가 Kiwi·영화 목록·Qdrant·OpenAI 연결을 미리 준비한다(첫 요청 약 3초 단축).
   - 결과: verify 출력 740 → 390토큰, verify 6.2 → 4.3초, 요청 중간값 8.5 → 6.8초, p95 10.6 → 9.1초(순차). E6 turns2 재측정: R@1 0.860 → 0.840, R@5 0.875 → 0.860, 요청 p95(동시 4) 10.5 → 8.8초, 질의당 $0.00082 → $0.00064. 질의별로는 1위가 11개 틀려지고 7개 맞아져 LLM 응답의 무작위성 범위로 보이지만, 작은 하락이 없다고 확인하지는 않았다.
-  - 아직 p95 > 8초다. 재질문으로 끝나는 첫 요청(재작성 2.2 + verify 4.3 + 질문 생성 1.2~2.5초)이 꼬리를 만든다. 남은 후보: 재질문 문장 고정(SPEC §7.6과 다름), rewrite·verify에 `reasoning_effort="none"`(gpt-6-luna는 `minimal`은 거부하고 `none`은 받는다, SPEC "low"와 다름).
+  - 이어서 **재질문 문장을 속성별 고정 문장(`search/clarify.py`의 `QUESTIONS`)으로 바꿨다**(사용자 결정, SPEC §7.6 "질문 문장은 LLM이 생성"과 다름). 재질문 요청마다 1.2~2.5초가 줄었다. `ask` 노드는 LLM 없이 질문만 만들고, 재개 시 같은 질문이 유지되도록 `clarify`와 나눈 구조는 유지한다.
+  - 결과(순차): 요청 중간값 6.4초, p95 8.5초(요청 23회라 ±0.5초 흔들림), 최대 8.8초. 남은 시간은 verify 4.6초 + rewrite 2.1초다. rewrite는 추론 토큰이 이미 0이라 `reasoning_effort="none"`의 효과가 없다.
+  - 남은 후보: verify에 `reasoning_effort="none"`(추론 약 144토큰, 약 1.5초 단축 예상, 판단 품질 위험, SPEC "low"와 다름. gpt-6-luna는 `minimal`은 거부하고 `none`은 받는다). Phase 6에서 E6을 여러 번 돌려 품질을 비교한 뒤 정한다.
 - 체크포인트 상태의 pydantic 모델은 `agent/state.py`의 `STATE_MODELS`에 등록해야 복원된다(`checkpoint.make_serde`). 새 모델을 상태에 넣으면 여기에도 추가한다.
 - 실제 실행 관찰(2026-10-04): 질의당 비용 약 $0.0006(재질문 2회 세션 약 $0.0018). **지연시간이 SPEC 목표를 넘는다**: verify 1회 약 7초, rewrite 1.5~3초 → 첫 응답 약 10초, 재질문마다 7~10초 추가. 서버 재시작 후 재개(새 연결·새 그래프)는 동작을 확인했다. 기생충 "물난리" 질의처럼 수집 이미지와 줄거리에 없는 장면은 재질문 후에도 후보에 들지 않는다.
 - 로컬 VLM은 E2 재실험용으로 남겨 둔다. `scripts/run_vlm.sh`로 띄운다(vLLM은 프로젝트 venv가 아닌 `~/.venvs/vllm`, vllm 0.30.0). 시작에 약 100초 걸린다.

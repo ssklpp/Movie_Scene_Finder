@@ -108,23 +108,3 @@ def verify_messages(
         {"role": "system", "content": VERIFY_SYSTEM},
         {"role": "user", "content": user},
     ]
-
-
-# --- ask (SPEC §7.6: 질문 문장만 LLM이 만든다) --------------------------------
-
-QUESTION_SYSTEM = """너는 영화 장면 검색기에서 사용자에게 되묻는 질문을 만든다.
-정해진 항목에 대해, 선택지를 고르기 쉽게 묻는 짧고 친근한 한국어 질문 한 문장만 출력한다.
-선택지는 따로 보여주므로 질문에 나열하지 않는다."""
-
-
-def question_messages(
-    attr_name: str, option_labels: Sequence[str], query_text: str | None
-) -> list[ChatCompletionMessageParam]:
-    user = (
-        f"물어볼 항목: {attr_name}\n선택지: {', '.join(option_labels)}\n"
-        f"사용자가 처음 한 말: {query_text or '(사진으로 검색)'}"
-    )
-    return [
-        {"role": "system", "content": QUESTION_SYSTEM},
-        {"role": "user", "content": user},
-    ]
