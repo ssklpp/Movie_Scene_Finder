@@ -93,8 +93,10 @@ class Backend:
 def backend_config(settings: Settings) -> Backend:
     """CAPTION_BACKEND별 모델, model_version, 클라이언트, 요청 옵션.
 
-    gpt-6-luna는 추론 모델이라 temperature 대신 reasoning_effort(SPEC: low)를 쓰고,
-    출력 한도(max_completion_tokens)에 추론 토큰이 포함되므로 한도를 넉넉히 둔다.
+    gpt-6-luna는 추론 모델이라 temperature 대신 reasoning_effort(SPEC: low)를 쓴다.
+    출력 한도(max_completion_tokens)에는 추론 토큰이 포함된다(100장 실측 평균 출력 254토큰).
+    OpenAI는 요청마다 "입력 + 출력 한도"를 분당 토큰 한도(TPM)에서 미리 차감하므로,
+    한도를 너무 크게 잡으면 429가 난다(계정 TPM 20만, 장당 입력 약 1,740토큰).
     """
     if settings.caption_backend == "local":
         return Backend(
@@ -109,7 +111,7 @@ def backend_config(settings: Settings) -> Backend:
             model,
             f"{model}-{PROMPT_VERSION}",
             llm.get_client,
-            {"reasoning_effort": "low", "max_completion_tokens": 2000},
+            {"reasoning_effort": "low", "max_completion_tokens": 1200},
         )
     raise SystemExit(f"CAPTION_BACKEND={settings.caption_backend} is not implemented yet")
 
@@ -184,17 +186,18 @@ def main() -> None:
     parser.add_argument("--sample", type=int, help="무작위 N장만 (고정 시드, 모델 비교용)")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--out", type=Path, help="결과를 DB 대신 이 jsonl 파일에만 쓴다")
-    parser.add_argument("--workers", type=int, help="동시 요청 수 (기본 local 3, openai 8)")
+    # 기본 3: local은 vLLM 동시 처리 한도, openai는 TPM 20만 안(분당 약 60건)에 들도록.
+    parser.add_argument("--workers", type=int, default=3, help="동시 요청 수")
     args = parser.parse_args()
     setup_logging()
-    logging.getLogger("httpx").setLevel(logging.WARNING)
-    logging.getLogger("app.core.llm").setLevel(logging.WARNING)
+    for noisy in ("httpx", "httpx2", "app.core.llm"):
+        logging.getLogger(noisy).setLevel(logging.WARNING)
 
     settings = get_settings()
     backend = backend_config(settings)
     model, model_version = backend.model, backend.model_version
     client = backend.make_client()
-    workers = args.workers or (3 if settings.caption_backend == "local" else 8)
+    workers = args.workers
 
     jobs = load_jobs(args.limit, args.sample, args.seed)
     state = State()
