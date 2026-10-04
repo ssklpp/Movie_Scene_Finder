@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from pipeline.common.schemas import People, SceneCaption
+from app.search.caption import People, SceneCaption
 from pipeline.s05_validate import (
     SceneRow,
     caption_problems,

@@ -11,7 +11,6 @@ s05가 다시 시도한다. `--sample N --out FILE`은 무작위 N장을 캡셔�
 """
 
 import argparse
-import base64
 import json
 import logging
 import random
@@ -23,7 +22,6 @@ from pathlib import Path
 from typing import Any
 
 from openai import OpenAI
-from openai.types.chat import ChatCompletionMessageParam
 from sqlalchemy import select, update
 
 from app.core import llm
@@ -31,35 +29,18 @@ from app.core.config import Settings, get_settings
 from app.core.logging import setup_logging
 from app.db.models import Movie, Scene
 from app.db.session import SessionLocal
-from pipeline.common.schemas import SceneCaption
+from app.search.caption import (
+    OPENAI_CAPTION_KWARGS,
+    PROMPT_VERSION,
+    SceneCaption,
+    build_messages,
+)
 from pipeline.common.state import State
 from pipeline.s02_collect_images import image_path
 
 logger = logging.getLogger(__name__)
 
 STEP = "s04"
-PROMPT_VERSION = "p1"
-
-SYSTEM_PROMPT = """너는 영화 장면 이미지를 검색용으로 묘사한다.
-사람들이 나중에 흐릿한 기억으로 이 장면을 찾는다.
-
-규칙:
-- 화면에 실제로 보이는 것만 쓴다. 줄거리나 보이지 않는 사건을 추측하지 않는다.
-- 배우, 등장인물, 실존 인물의 이름과 영화 제목은 절대 쓰지 않는다. 알아보더라도 쓰지 않는다.
-  인물은 "젊은 남자", "단발머리 소녀", "초록색 거인"처럼 겉모습으로 부른다.
-- caption_ko: 자연스러운 한국어 한 문장, 40~120자.
-  장소, 인물의 행동, 눈에 띄는 물건과 분위기를 담는다.
-- caption_en: caption_ko와 같은 내용의 영어 한 문장.
-- setting: 장소를 짧은 한국어로 (예: "비 오는 골목", "우주선 조종실").
-- time_of_day: day, night, dawn, dusk 중 하나. 알 수 없으면 unknown.
-- weather: 날씨가 보이면 짧은 한국어 (예: "비", "눈보라"), 실내이거나 알 수 없으면 null.
-- people.count: 보이는 사람(또는 사람처럼 행동하는 캐릭터) 수.
-  people.actions: 행동을 짧은 한국어 구로.
-- objects: 눈에 띄는 물건 최대 8개, 한국어 명사.
-- colors: 화면의 주요 색 최대 4개, 한국어.
-- text_in_frame: 화면에 적힌 글자를 그대로. 없으면 null."""
-
-USER_PROMPT = "이 영화 장면을 규칙에 맞춰 JSON으로 묘사해."
 
 
 @dataclass(frozen=True)
@@ -111,23 +92,9 @@ def backend_config(settings: Settings) -> Backend:
             model,
             f"{model}-{PROMPT_VERSION}",
             llm.get_client,
-            {"reasoning_effort": "low", "max_completion_tokens": 1200},
+            OPENAI_CAPTION_KWARGS,
         )
     raise SystemExit(f"CAPTION_BACKEND={settings.caption_backend} is not implemented yet")
-
-
-def build_messages(image_bytes: bytes) -> list[ChatCompletionMessageParam]:
-    b64 = base64.b64encode(image_bytes).decode()
-    return [
-        {"role": "system", "content": SYSTEM_PROMPT},
-        {
-            "role": "user",
-            "content": [
-                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}},
-                {"type": "text", "text": USER_PROMPT},
-            ],
-        },
-    ]
 
 
 def to_scene_values(caption: SceneCaption, model_version: str) -> dict[str, Any]:

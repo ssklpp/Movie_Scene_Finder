@@ -33,8 +33,8 @@ from app.core.config import REPO_ROOT, get_settings
 from app.core.logging import setup_logging
 from app.db.models import Movie, Scene
 from app.db.session import SessionLocal
+from app.search.caption import SceneCaption
 from pipeline.build_user_dict import CREDITS_DIR, credit_names, name_words
-from pipeline.common.schemas import SceneCaption
 from pipeline.common.state import State
 from pipeline.s04_caption import STEP as S04_STEP
 from pipeline.s04_caption import (

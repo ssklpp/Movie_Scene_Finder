@@ -6,14 +6,17 @@ import pytest
 from openai import OpenAI
 
 from app.core.config import Settings
-from pipeline.common.schemas import People, SceneCaption
-from pipeline.s02_collect_images import IMAGES_DIR
-from pipeline.s04_caption import (
+from app.search.caption import (
     PROMPT_VERSION,
     SYSTEM_PROMPT,
+    People,
+    SceneCaption,
+    build_messages,
+)
+from pipeline.s02_collect_images import IMAGES_DIR
+from pipeline.s04_caption import (
     SceneJob,
     backend_config,
-    build_messages,
     caption_one,
     scene_image_path,
     to_scene_values,
