@@ -1,0 +1,5 @@
+# E6: 최대 재질문 횟수 비교 (SPEC §11). 에이전트 + 재질문 시뮬레이터.
+experiment: E6
+name: turns1
+agent: true
+max_clarify_turns: 1

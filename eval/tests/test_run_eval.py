@@ -85,6 +85,7 @@ def test_latest_per_name_and_table() -> None:
     assert [r.id for r in latest] == [2, 3]
     table = comparison_table(latest)
     assert "| hybrid | 0.300 |" in table and "| dense | 0.200 |" in table
+    assert "| 0.300 | - | - |" in table  # 검색만 평가한 실행은 재질문 지표가 없다
 
 
 def test_default_config_uses_env_weights() -> None:
