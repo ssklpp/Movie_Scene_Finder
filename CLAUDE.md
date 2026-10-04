@@ -103,7 +103,15 @@ Python은 항상 `uv run`으로 실행한다(Python 3.12로 고정하고 시스�
     | **verify만 none** (`E6_turns2_verify_none`) | 0.865 | 0.875 | 0.869 | 0.33 | 5.1초 | 6.5초 | $0.00050 |
     | 둘 다 none (`E6_turns2_all_none`) | 0.840 | 0.845 | 0.843 | 0.28 | 5.0초 | 6.6초 | $0.00047 |
 
-    verify none은 low 대비 1위가 11개 틀려지고 12개 맞아져 무작위성 범위다. none이면 추론 토큰이 0이고 답(reason)도 짧아진다(출력 약 390 → 190토큰). rewrite는 대개 추론 토큰이 0이라 none으로 바꿔도 빨라지지 않고 R@1만 내려가 low로 둔다. 기본값이 바뀌었으므로 `E6_turns2.yaml`을 다시 돌리면 verify none으로 실행된다(run 8은 low).
+    verify none은 low 대비 1위가 11개 틀려지고 12개 맞아져 무작위성 범위다. none이면 추론 토큰이 0이고 답(reason)도 짧아진다(출력 약 390 → 190토큰). 기본값이 바뀌었으므로 `E6_turns2.yaml`을 다시 돌리면 none으로 실행된다(run 8은 둘 다 low).
+  - **이어서 rewrite도 none으로 바꿨다(2026-10-05, 사용자 결정).** 배포 후 LangSmith 추적에서 rewrite(low)가 가끔 추론 558~753토큰을 써 호출 하나가 8.3초, 요청이 12~14초 걸린 것을 확인했다(대개는 추론 60~80토큰, 1.8~2.1초). E6를 한 번씩 더 돌려(run 11·12) 두 번씩 비교했다:
+
+    | 설정 | R@1 (2회) | 요청 p95 (2회) | 요청 최대 (2회) | 10초 넘는 요청 |
+    | --- | --- | --- | --- | --- |
+    | verify만 none | 173, 176 / 200 | 6.5, 7.5초 | 8.8, 17.6초 | 0, 4회 |
+    | 둘 다 none | 168, 174 / 200 | 6.6, 6.6초 | 8.5, 11.5초 | 0, 1회 |
+
+    같은 설정 두 실행 사이에도 1위가 바뀌는 질의가 22~25개라, 두 설정의 차이(400회 중 7회, 질의별 19 대 12)는 무작위성 범위로 판단했다. 꼬리 지연은 둘 다 none이 확실히 작다.
 - 프런트엔드(`frontend/app/`, Next.js 16): `components/SceneSearch.tsx`가 상태(검색 → 진행 단계 → 재질문 → 결과)를 관리하고, `lib/api.ts`가 POST SSE를 `fetch` 스트림으로 읽는다(`EventSource`는 GET만 지원). API 주소는 `NEXT_PUBLIC_API_URL`(`frontend/.env.example`), backend는 `CORS_ORIGINS`로 허용한다.
   - 디자인: 밝은 차가운 회색 바탕에 2.39:1 "영화 화면" 하나, 입력은 그 화면 아래의 자막(노란 글자 + 검은 테두리). 포인트 색은 자막 노랑 `#F3E36B` 하나이고 자막과 캡션 강조에만 쓴다. 글꼴은 제목 Song Myung, 본문 IBM Plex Sans KR. 토큰은 `globals.css`의 `@theme`.
   - 화면 확인: WSL에는 Chromium 실행 라이브러리가 없어(sudo 필요) Windows의 Node + `playwright-core` + Edge(`channel: "msedge"`)로 `localhost:3000`을 캡처했다(스크립트는 저장소 밖). 포스터는 지연 로딩이라 스크롤해야 찍힌다.

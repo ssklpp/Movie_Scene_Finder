@@ -56,8 +56,8 @@ class Settings(BaseSettings):
     w_second_scene: float = 0.3
     w_plot: float = 0.5
     soft_filter_boost: float = 1.1
-    # 에이전트 LLM 호출의 추론 강도. verify는 none(E6 비교: 품질 같고 요청 p95 약 1.9초 단축).
-    rewrite_reasoning_effort: ReasoningEffort = "low"
+    # 에이전트 LLM 호출의 추론 강도. 둘 다 none(E6 비교: 품질 차이 없고 지연시간 꼬리가 사라짐).
+    rewrite_reasoning_effort: ReasoningEffort = "none"
     verify_reasoning_effort: ReasoningEffort = "none"
 
     # Ops
