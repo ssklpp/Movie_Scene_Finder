@@ -13,6 +13,7 @@ dependencies = [
     "psycopg[binary]>=3.2",
     "openai>=1.40",
     "httpx>=0.27",
+    "kiwipiepy>=0.24.0",
 ]
 
 [build-system]

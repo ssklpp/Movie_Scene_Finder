@@ -29,6 +29,13 @@ class TmdbClient:
         result: dict[str, Any] = get_json(self._client, f"/movie/{tmdb_id}", params)
         return result
 
+    def movie_credits(self, tmdb_id: int) -> dict[str, Any]:
+        """출연·제작진. ko-KR로 요청하면 배우·감독 이름이 한글로 온다(배역 이름은 대개 영어)."""
+        result: dict[str, Any] = get_json(
+            self._client, f"/movie/{tmdb_id}/credits", {"language": "ko-KR"}
+        )
+        return result
+
     def movie_images(self, tmdb_id: int) -> dict[str, Any]:
         """언어 구분 없이 모든 이미지. 각 항목의 `iso_639_1`이 None이면 글자 없는 이미지다."""
         result: dict[str, Any] = get_json(self._client, f"/movie/{tmdb_id}/images")

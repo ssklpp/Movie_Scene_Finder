@@ -42,5 +42,10 @@ strict = true
 plugins = ["pydantic.mypy"]
 exclude = ["^backend/alembic/"]
 
+[[tool.mypy.overrides]]
+# kiwipiepy는 타입 정보(py.typed)를 제공하지 않는다.
+module = ["kiwipiepy", "kiwipiepy.*"]
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 testpaths = ["backend/tests", "pipeline/tests"]
