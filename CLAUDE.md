@@ -95,7 +95,15 @@ Python은 항상 `uv run`으로 실행한다(Python 3.12로 고정하고 시스�
   - 결과: verify 출력 740 → 390토큰, verify 6.2 → 4.3초, 요청 중간값 8.5 → 6.8초, p95 10.6 → 9.1초(순차). E6 turns2 재측정: R@1 0.860 → 0.840, R@5 0.875 → 0.860, 요청 p95(동시 4) 10.5 → 8.8초, 질의당 $0.00082 → $0.00064. 질의별로는 1위가 11개 틀려지고 7개 맞아져 LLM 응답의 무작위성 범위로 보이지만, 작은 하락이 없다고 확인하지는 않았다.
   - 이어서 **재질문 문장을 속성별 고정 문장(`search/clarify.py`의 `QUESTIONS`)으로 바꿨다**(사용자 결정, SPEC §7.6 "질문 문장은 LLM이 생성"과 다름). 재질문 요청마다 1.2~2.5초가 줄었다. `ask` 노드는 LLM 없이 질문만 만들고, 재개 시 같은 질문이 유지되도록 `clarify`와 나눈 구조는 유지한다.
   - 결과(순차): 요청 중간값 6.4초, p95 8.5초(요청 23회라 ±0.5초 흔들림), 최대 8.8초. 남은 시간은 verify 4.6초 + rewrite 2.1초다. rewrite는 추론 토큰이 이미 0이라 `reasoning_effort="none"`의 효과가 없다.
-  - 남은 후보: verify에 `reasoning_effort="none"`(추론 약 144토큰, 약 1.5초 단축 예상, 판단 품질 위험, SPEC "low"와 다름. gpt-6-luna는 `minimal`은 거부하고 `none`은 받는다). Phase 6에서 E6을 여러 번 돌려 품질을 비교한 뒤 정한다.
+  - **verify를 `reasoning_effort="none"`으로 바꿨다(2026-10-04, 사용자 결정).** 설정 `VERIFY_REASONING_EFFORT`(기본 none)·`REWRITE_REASONING_EFFORT`(기본 low), 평가 설정에서도 바꿀 수 있다. gpt-6-luna는 `minimal`은 거부하고 `none`은 받는다. 같은 날 같은 조건으로 E6 turns2(dev 200, 동시 4) 3가지를 비교했다(run 8~10):
+
+    | 설정 | R@1 | R@5 | MRR | 평균 재질문 | 요청 중간값 | 요청 p95 | 질의당 비용 |
+    | --- | --- | --- | --- | --- | --- | --- | --- |
+    | 둘 다 low (`E6_turns2`, 이전 기본) | 0.860 | 0.870 | 0.864 | 0.30 | 6.9초 | 8.4초 | $0.00062 |
+    | **verify만 none** (`E6_turns2_verify_none`) | 0.865 | 0.875 | 0.869 | 0.33 | 5.1초 | 6.5초 | $0.00050 |
+    | 둘 다 none (`E6_turns2_all_none`) | 0.840 | 0.845 | 0.843 | 0.28 | 5.0초 | 6.6초 | $0.00047 |
+
+    verify none은 low 대비 1위가 11개 틀려지고 12개 맞아져 무작위성 범위다. none이면 추론 토큰이 0이고 답(reason)도 짧아진다(출력 약 390 → 190토큰). rewrite는 대개 추론 토큰이 0이라 none으로 바꿔도 빨라지지 않고 R@1만 내려가 low로 둔다. 기본값이 바뀌었으므로 `E6_turns2.yaml`을 다시 돌리면 verify none으로 실행된다(run 8은 low).
 - 프런트엔드(`frontend/app/`, Next.js 16): `components/SceneSearch.tsx`가 상태(검색 → 진행 단계 → 재질문 → 결과)를 관리하고, `lib/api.ts`가 POST SSE를 `fetch` 스트림으로 읽는다(`EventSource`는 GET만 지원). API 주소는 `NEXT_PUBLIC_API_URL`(`frontend/.env.example`), backend는 `CORS_ORIGINS`로 허용한다.
   - 디자인: 밝은 차가운 회색 바탕에 2.39:1 "영화 화면" 하나, 입력은 그 화면 아래의 자막(노란 글자 + 검은 테두리). 포인트 색은 자막 노랑 `#F3E36B` 하나이고 자막과 캡션 강조에만 쓴다. 글꼴은 제목 Song Myung, 본문 IBM Plex Sans KR. 토큰은 `globals.css`의 `@theme`.
   - 화면 확인: WSL에는 Chromium 실행 라이브러리가 없어(sudo 필요) Windows의 Node + `playwright-core` + Edge(`channel: "msedge"`)로 `localhost:3000`을 캡처했다(스크립트는 저장소 밖). 포스터는 지연 로딩이라 스크롤해야 찍힌다.

@@ -1,7 +1,7 @@
 """verify: LLM 검증 → 재정렬 → 확신도(§7.5), 재질문이 필요하면 속성을 고른다(§7.6)."""
 
 from app.agent.movies import movie_info
-from app.agent.nodes.common import LLM_KWARGS, logger, timed
+from app.agent.nodes.common import llm_kwargs, logger, timed
 from app.agent.prompts import verify_messages
 from app.agent.state import SearchState
 from app.core import llm
@@ -25,7 +25,7 @@ def verify(state: SearchState) -> SearchState:
             verify_messages(state.get("query_text"), state.get("image_caption"), candidates, infos),
             VerifyOutput,
             model=s.llm_model_default,
-            **LLM_KWARGS,
+            **llm_kwargs(s.verify_reasoning_effort),
         )
         cost = stats.cost_usd
         verified = out.items if out else []

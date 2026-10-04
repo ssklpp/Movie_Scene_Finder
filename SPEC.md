@@ -46,7 +46,7 @@
 | 언어·패키지 | Python 3.12 (uv로 프로젝트 고정, 시스템의 3.14는 사용하지 않음) + uv, Node.js 22 LTS + pnpm |
 | 백엔드 | FastAPI, Pydantic v2, pydantic-settings, SQLAlchemy 2 + Alembic, sse-starlette, slowapi |
 | 에이전트 | LangGraph (PostgresSaver 체크포인터). LLM 호출은 `langchain-openai` 없이 `core/llm.py` 래퍼(OpenAI SDK)로 한다 |
-| LLM | 기본 `gpt-6-luna` (reasoning effort low), 고품질 폴백 `gpt-6.1-sol` |
+| LLM | 기본 `gpt-6-luna` (reasoning effort low, verify만 none: 지연시간 때문, E6로 품질 확인), 고품질 폴백 `gpt-6.1-sol` |
 | VLM | 대량 캡셔닝: `gpt-6-luna` 실시간 API(E2 비교로 결정). 비교용 로컬 `cyankiwi/Qwen3-VL-4B-Instruct-AWQ-4bit` (vLLM, OpenAI 호환 엔드포인트. 원본 Qwen3-VL-4B는 VRAM 8GB에 들어가지 않음) / 실시간 이미지: `gpt-6-luna` |
 | 임베딩 | `text-embedding-3-small` (1536차원) |
 | 형태소 분석 | kiwipiepy (사용자 사전: 영화 제목·인물명) |
@@ -147,6 +147,9 @@ MOVIE_TOPK=10
 W_SECOND_SCENE=0.3
 W_PLOT=0.5
 SOFT_FILTER_BOOST=1.1
+# 에이전트 LLM 추론 강도: none | low | medium | high
+REWRITE_REASONING_EFFORT=low
+VERIFY_REASONING_EFFORT=none
 
 # Ops
 RATE_LIMIT_PER_DAY=30
@@ -276,6 +279,7 @@ s1, s2 = 해당 영화 장면 RRF 점수 1·2위(없으면 0), p_m = 줄거리 �
 
 - `gpt-6-luna`에 사용자 묘사 + 후보 10편의 제목·연도·근거 캡션을 주고 영화별 `{movie_id, score: 0~1, reason}`을 structured output으로 받는다.
   - `evidence_scene_ids`는 받지 않는다. 근거 장면은 검색 결과에서 가져오고, 이 필드가 출력 토큰의 약 30%를 차지해 응답이 느려졌다. `reason`은 점수 상위 5편만 50자 이내로 쓴다(지연시간은 출력 토큰 수에 비례).
+  - `reasoning_effort="none"`으로 부른다(`VERIFY_REASONING_EFFORT`). dev E6에서 low와 정확도가 같고 요청 p95가 약 1.9초 짧았다.
   - 제목·연도를 주어 LLM의 영화 지식을 쓰되, "제목 글자로 점수를 올리지 말 것", "흔한 장면이면 0.5 이하"를 프롬프트에 넣는다.
 - 검증 점수로 재정렬한다. v1, v2 = 1·2위 점수.
 - `confidence = 0.6 * v1 + 0.4 * min(1, (v1 - v2) / 0.3)`

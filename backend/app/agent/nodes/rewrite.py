@@ -4,7 +4,7 @@ import re
 from collections.abc import Collection
 
 from app.agent.movies import known_genres
-from app.agent.nodes.common import LLM_KWARGS, logger, timed
+from app.agent.nodes.common import llm_kwargs, logger, timed
 from app.agent.prompts import RewriteOutput, SoftFilterFields, rewrite_messages
 from app.agent.state import Rewritten, SearchState
 from app.core import llm
@@ -36,12 +36,13 @@ def fallback(state: SearchState) -> Rewritten:
 @timed("rewrite_query")
 def rewrite_query(state: SearchState) -> SearchState:
     genres = known_genres()
+    s = get_settings()
     try:
         out, stats = llm.parse(
             rewrite_messages(state.get("query_text"), state.get("image_caption"), genres),
             RewriteOutput,
-            model=get_settings().llm_model_default,
-            **LLM_KWARGS,
+            model=s.llm_model_default,
+            **llm_kwargs(s.rewrite_reasoning_effort),
         )
     except Exception as e:
         logger.warning("rewrite failed, using raw query: %s", e)

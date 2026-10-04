@@ -1,0 +1,6 @@
+# E6 변형: 재질문 2회 + verify 추론 없음(reasoning_effort=none). 지연시간 대비 품질 확인.
+experiment: E6
+name: turns2_verify_none
+agent: true
+max_clarify_turns: 2
+verify_reasoning_effort: none

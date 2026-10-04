@@ -40,7 +40,7 @@ from sqlalchemy import select
 
 from app.agent.checkpoint import make_serde
 from app.agent.graph import build_graph, initial_state
-from app.core.config import REPO_ROOT, get_settings
+from app.core.config import REPO_ROOT, ReasoningEffort, get_settings
 from app.core.logging import setup_logging
 from app.db.models import EvalRun, Movie
 from app.db.session import SessionLocal
@@ -70,6 +70,8 @@ class EvalConfig(BaseModel):
     movie_topk: int | None = None
     max_clarify_turns: int | None = None  # 에이전트 모드만
     confidence_threshold: float | None = None  # 에이전트 모드만
+    rewrite_reasoning_effort: ReasoningEffort | None = None  # 에이전트 모드만
+    verify_reasoning_effort: ReasoningEffort | None = None  # 에이전트 모드만
 
 
 @dataclass(frozen=True)
@@ -225,6 +227,10 @@ def apply_overrides(cfg: EvalConfig) -> None:
         settings.max_clarify_turns = cfg.max_clarify_turns
     if cfg.confidence_threshold is not None:
         settings.confidence_threshold = cfg.confidence_threshold
+    if cfg.rewrite_reasoning_effort is not None:
+        settings.rewrite_reasoning_effort = cfg.rewrite_reasoning_effort
+    if cfg.verify_reasoning_effort is not None:
+        settings.verify_reasoning_effort = cfg.verify_reasoning_effort
 
 
 def git_commit() -> str:

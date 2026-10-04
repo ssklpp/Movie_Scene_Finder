@@ -1,0 +1,7 @@
+# E6 변형: 재질문 2회 + rewrite·verify 모두 추론 없음(reasoning_effort=none).
+experiment: E6
+name: turns2_all_none
+agent: true
+max_clarify_turns: 2
+rewrite_reasoning_effort: none
+verify_reasoning_effort: none

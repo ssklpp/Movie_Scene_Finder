@@ -5,6 +5,9 @@ from typing import Literal
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# gpt-6-luna가 받는 값("minimal"은 거부한다)
+ReasoningEffort = Literal["none", "low", "medium", "high"]
+
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
@@ -53,6 +56,9 @@ class Settings(BaseSettings):
     w_second_scene: float = 0.3
     w_plot: float = 0.5
     soft_filter_boost: float = 1.1
+    # 에이전트 LLM 호출의 추론 강도. verify는 none(E6 비교: 품질 같고 요청 p95 약 1.9초 단축).
+    rewrite_reasoning_effort: ReasoningEffort = "low"
+    verify_reasoning_effort: ReasoningEffort = "none"
 
     # Ops
     rate_limit_per_day: int = 30

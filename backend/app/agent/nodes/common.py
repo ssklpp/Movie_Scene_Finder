@@ -8,8 +8,10 @@ from app.agent.state import SearchState
 
 logger = logging.getLogger("app.agent")
 
-# gpt-6-luna(추론 모델) 텍스트 호출 옵션. SPEC: reasoning effort low.
-LLM_KWARGS: dict[str, Any] = {"reasoning_effort": "low", "max_completion_tokens": 2000}
+
+def llm_kwargs(reasoning_effort: str) -> dict[str, Any]:
+    """gpt-6-luna(추론 모델) 텍스트 호출 옵션. 추론 강도는 노드별 설정(rewrite/verify)."""
+    return {"reasoning_effort": reasoning_effort, "max_completion_tokens": 2000}
 
 
 class Node(Protocol):
