@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 현재 상태
 
-- **현재 Phase: 1 (데이터 수집)**. Phase 0 완료(2026-10-04, 로컬 기준과 CI 녹색 확인). 원격 저장소: https://github.com/ssklpp/Movie_Scene_Finder. Phase 완료 기준(§12)을 통과하면 이 줄을 갱신한다.
+- **현재 Phase: 2 (캡셔닝과 적재)**. Phase 0·1 완료(2026-10-04). Phase 1 결과: movies 300편, 이미지 4,446장, scenes 3,852행, Kiwi 사용자 사전, human 질의 20개. KMDb 줄거리 보강은 API 키 발급 대기 중(완료 기준 밖). 원격 저장소: https://github.com/ssklpp/Movie_Scene_Finder. Phase 완료 기준(§12)을 통과하면 이 줄을 갱신한다.
 - 현재 Phase의 완료 기준을 통과하기 전에는 다음 Phase 코드를 만들지 않는다.
 - 저장소는 WSL 홈(`~/projects/movie-scene-finder`)에 있다. 모든 명령은 WSL2 셸에서 실행한다(`/mnt/c/...`나 Windows 쪽 Python·Node는 쓰지 않는다).
 - Python 프로젝트는 backend·pipeline·eval이 함께 쓰는 uv workspace 하나로 만든다(`requires-python = ">=3.12,<3.13"`, §12 Phase 0). §3 트리에 보이는 `backend/pyproject.toml`은 workspace 멤버다.
