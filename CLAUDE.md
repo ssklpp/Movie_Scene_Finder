@@ -65,6 +65,9 @@ Python은 항상 `uv run`으로 실행한다(Python 3.12로 고정하고 시스�
 - 전체 캡셔닝 결과(2026-10-04): 3,852장 모두 `gpt-6-luna-p1`, 총 약 $1.1, 약 1시간. 계정 `gpt-6-luna` 한도가 **TPM 20만**이고 OpenAI는 "입력 + max_completion_tokens"를 미리 차감하므로, s04·s05는 동시 요청 3개, `max_completion_tokens=1200`을 쓴다(8개·2,000일 때 9%가 429로 실패했다).
 - s05 검증: 실패 7장(0.18%, 목표 < 2%). 모두 알려진 오탐이다. 마이클(936075)의 "마이크"(출연진 이름 일부 = 마이크), 에이리언(348)의 "Alien"(영어 제목 = 외계인). 실패 장면도 캡션은 DB에 남아 있고, 재시도에서 규칙을 통과한 캡션만 덮어쓴다. 한 글자 예명("비")은 날씨와 겹쳐 검사에서 뺐다.
 - 사람 검수(무작위 50장, `s05 --seed 0`, 2026-10-04): **환각 0건**, **홍보·합성 이미지 20장(40%)**. 홍보 이미지(정면 포즈, 단색 배경, 콜라주)의 캡션은 사용자가 기억하는 장면과 잘 맞지 않으므로, Phase 3 평가에서 이 이미지를 빼거나 가중치를 낮췄을 때 검색이 나아지는지 확인한다. 검수 파일은 `reports/caption_review.csv`(git 제외)다.
+- s06은 검색 문서를 DB가 아닌 `pipeline/data/search_docs.jsonl`에 쓴다(SPEC 스키마에 search_text 컬럼이 없다). 화면 속 글자(text_in_frame)는 제목 로고가 있을 수 있어 넣지 않는다.
+- `search/sparse.py`(SPEC §7.3 이전에 s07이 필요해 Phase 2에서 만들었다): Kiwi는 활용 종류를 품사 접미사로 붙이므로(`VV-R`, `VA-I`) 품사는 `-` 앞부분으로 비교한다. 영어(SL)는 소문자로 맞춘다. `bm25_stats.json`에는 컬렉션별 avgdl을 둔다(`scenes` 약 33.2, `movies` 약 54.6 토큰).
+- s07 출력은 `pipeline/data/vectors/{scenes,movies}.parquet`. dense는 "모델|차원|문서" 해시로 캐시해 바뀐 문서만 다시 임베딩한다. 전체 임베딩 비용 약 $0.012. 줄거리가 없는 영화 1편은 `movies`에서 빠진다(p_m = 0).
 - 로컬 VLM은 E2 재실험용으로 남겨 둔다. `scripts/run_vlm.sh`로 띄운다(vLLM은 프로젝트 venv가 아닌 `~/.venvs/vllm`, vllm 0.30.0). 시작에 약 100초 걸린다.
   - 모델은 SPEC의 원본 `Qwen/Qwen3-VL-4B-Instruct`가 아니라 **AWQ 4비트 양자화본 `cyankiwi/Qwen3-VL-4B-Instruct-AWQ-4bit`**다. 원본(8.9GB)은 VRAM에 안 들어가고, 공식 FP8(5.7GiB)은 최대 길이 3,072로 줄여야 했으며 시작 중 WSL이 재시작됐다. AWQ 4비트는 SPEC 설정(4,096, 0.85) 그대로 뜨고 KV 캐시 1.89GiB가 남는다. 캡션 1장 약 1~2초, 입력 약 930토큰.
   - Windows 화면 표시가 VRAM을 쓴다. 브라우저·Discord·Steam 등을 끄면 약 0.5GB가 늘어난다.

@@ -7,6 +7,7 @@ dependencies = [
     "imagehash>=4.3.2",
     "msf-backend",
     "pillow>=12.3.0",
+    "pyarrow>=25.0.1",
 ]
 
 [dependency-groups]
@@ -43,8 +44,8 @@ plugins = ["pydantic.mypy"]
 exclude = ["^backend/alembic/"]
 
 [[tool.mypy.overrides]]
-# kiwipiepy는 타입 정보(py.typed)를 제공하지 않는다.
-module = ["kiwipiepy", "kiwipiepy.*"]
+# kiwipiepy, pyarrow는 타입 정보(py.typed)를 제공하지 않는다.
+module = ["kiwipiepy", "kiwipiepy.*", "pyarrow", "pyarrow.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
