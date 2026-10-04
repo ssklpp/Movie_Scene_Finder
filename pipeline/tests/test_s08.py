@@ -1,9 +1,20 @@
+import io
+from pathlib import Path
+
 import pytest
+from PIL import Image
 
 from app.core.retry import retry
 from app.db.models import Movie
 from app.search.qdrant import decade_key
-from pipeline.s08_upload import batches, movie_payload, next_version, point_id, stale_versions
+from pipeline.s08_upload import (
+    batches,
+    make_thumbnail,
+    movie_payload,
+    next_version,
+    point_id,
+    stale_versions,
+)
 
 
 def test_decade_key_matches_clarify_option_format() -> None:
@@ -65,3 +76,18 @@ def test_retry_succeeds_after_failures_and_gives_up() -> None:
 
     with pytest.raises(ConnectionError):
         retry(always_fail, "fail", max_retries=2, backoff_s=0)
+
+
+def test_make_thumbnail_limits_long_side(tmp_path: Path) -> None:
+    src = tmp_path / "a.jpg"
+    Image.new("RGB", (1280, 720), "red").save(src)
+    with Image.open(io.BytesIO(make_thumbnail(src))) as im:
+        assert im.size == (512, 288)
+        assert im.format == "JPEG"
+
+
+def test_make_thumbnail_does_not_upscale(tmp_path: Path) -> None:
+    src = tmp_path / "a.png"
+    Image.new("RGBA", (300, 200)).save(src)
+    with Image.open(io.BytesIO(make_thumbnail(src))) as im:
+        assert im.size == (300, 200)

@@ -3,6 +3,7 @@
 from app.agent.movies import movie_info
 from app.agent.nodes.common import timed
 from app.agent.state import EvidenceScene, ResultItem, SearchState
+from app.search.thumbs import thumb_url
 
 TOP_RESULTS = 5
 
@@ -23,7 +24,11 @@ def answer(state: SearchState) -> SearchState:
                 score=v.score if v else 0.0,
                 reason=v.reason if v else "",
                 evidence=[
-                    EvidenceScene(scene_id=h.scene_id, thumb_url=None, caption_ko=h.caption_ko)
+                    EvidenceScene(
+                        scene_id=h.scene_id,
+                        thumb_url=thumb_url(h.scene_id),
+                        caption_ko=h.caption_ko,
+                    )
                     for h in c.evidence
                 ],
             )

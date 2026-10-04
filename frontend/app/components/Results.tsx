@@ -78,18 +78,32 @@ export default function Results({ sessionId, items, confidence, query }: Props) 
                 <p className="mt-1 text-muted">줄거리가 비슷해 후보에 올랐어요.</p>
               )}
               {item.evidence.length > 0 && (
-                <ul className="mt-3 space-y-1.5 text-sm text-muted">
+                <ul className="mt-3 space-y-2 text-sm text-muted">
                   {item.evidence.map((e) => (
-                    <li key={e.scene_id} className="border-l-2 border-line pl-3">
-                      {highlight(e.caption_ko, terms).map((seg, k) =>
-                        seg.match ? (
-                          <mark key={k} className="bg-subtitle/60 px-0.5 text-ink">
-                            {seg.text}
-                          </mark>
-                        ) : (
-                          <span key={k}>{seg.text}</span>
-                        ),
+                    <li key={e.scene_id} className="flex items-start gap-3 border-l-2 border-line pl-3">
+                      {e.thumb_url && (
+                        // eslint-disable-next-line @next/next/no-img-element -- R2 썸네일은 이미 512px로 줄여 올렸다
+                        <img
+                          src={e.thumb_url}
+                          alt=""
+                          loading="lazy"
+                          width={512}
+                          height={288}
+                          className="aspect-video w-24 shrink-0 rounded-sm bg-line object-cover sm:w-32"
+                          onError={(ev) => (ev.currentTarget.style.display = "none")}
+                        />
                       )}
+                      <p className="min-w-0">
+                        {highlight(e.caption_ko, terms).map((seg, k) =>
+                          seg.match ? (
+                            <mark key={k} className="bg-subtitle/60 px-0.5 text-ink">
+                              {seg.text}
+                            </mark>
+                          ) : (
+                            <span key={k}>{seg.text}</span>
+                          ),
+                        )}
+                      </p>
                     </li>
                   ))}
                 </ul>

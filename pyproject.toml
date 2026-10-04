@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "장면 기억 검색기: workspace root (pipeline, eval)"
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "boto3>=1.43.108",
     "imagehash>=4.3.2",
     "msf-backend",
     "pillow>=12.3.0",
@@ -46,8 +47,8 @@ plugins = ["pydantic.mypy"]
 exclude = ["^backend/alembic/"]
 
 [[tool.mypy.overrides]]
-# kiwipiepy, pyarrow는 타입 정보(py.typed)를 제공하지 않는다.
-module = ["kiwipiepy", "kiwipiepy.*", "pyarrow", "pyarrow.*"]
+# kiwipiepy, pyarrow, boto3/botocore는 타입 정보(py.typed)를 제공하지 않는다.
+module = ["kiwipiepy", "kiwipiepy.*", "pyarrow", "pyarrow.*", "boto3", "boto3.*", "botocore", "botocore.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

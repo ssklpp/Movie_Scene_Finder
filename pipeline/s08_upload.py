@@ -7,24 +7,32 @@
 - 포인트 ID는 Qdrant가 정수·UUID만 받으므로 scene_id(또는 movie id)에서 만든 UUID5다.
   원래 scene_id는 payload에 둔다.
 - 입력 parquet가 그대로면 건너뛴다(state.sqlite). `QDRANT_URL`만 바꾸면 클라우드에도 적재된다.
-- 썸네일 R2 업로드(SPEC)는 R2 설정이 생기는 Phase 5에서 추가한다.
+- 썸네일: 긴 변 512px JPEG을 R2(S3 호환)에 올리고 scenes.r2_key를 채운다. 벡터 적재와 따로
+  장면마다 기록하므로(state.sqlite, 버킷별) 벡터를 건너뛰어도 남은 썸네일만 올린다.
+  R2 설정(R2_ACCOUNT_ID 등)이 없으면 건너뛴다.
 """
 
 import argparse
 import hashlib
+import io
 import logging
 import re
 import uuid
 from collections.abc import Iterator, Sequence
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import partial
+from pathlib import Path
 from typing import Any
 
+import boto3
 import pyarrow.parquet as pq
+from botocore.config import Config
+from PIL import Image
 from qdrant_client import QdrantClient
 from qdrant_client import models as qm
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 
-from app.core.config import get_settings
+from app.core.config import Settings, get_settings
 from app.core.logging import setup_logging
 from app.core.retry import retry
 from app.db.models import Movie, Scene
@@ -39,12 +47,17 @@ from app.search.qdrant import (
     decade_key,
     get_qdrant,
 )
+from app.search.thumbs import THUMB_SIZE, thumb_key
 from pipeline.common.state import State
+from pipeline.s04_caption import scene_image_path
 from pipeline.s07_embed import MOVIES_PARQUET, SCENES_PARQUET
 
 logger = logging.getLogger(__name__)
 
 STEP = "s08"
+THUMB_STEP = "s08_thumb"
+THUMB_WORKERS = 8
+THUMB_QUALITY = 82
 UPSERT_BATCH = 256
 POINT_NAMESPACE = uuid.UUID("6f1c2b0e-3a4d-4e7b-9c1a-5d2e8f0b7a11")
 # 필터에 쓰는 payload 필드 (SPEC §5.2의 * 표시)
@@ -198,16 +211,78 @@ def swap_alias(client: QdrantClient, alias: str, collection: str) -> None:
     retry(lambda: client.update_collection_aliases(change_aliases_operations=ops), "swap alias")
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--limit", type=int, help="movies 앞 N편만 (s01과 같은 순서)")
-    parser.add_argument("--force", action="store_true", help="입력이 같아도 다시 적재")
-    parser.add_argument("--keep", type=int, default=2, help="남길 scenes_v{n} 개수(현재 포함)")
-    args = parser.parse_args()
-    setup_logging()
-    logging.getLogger("httpx").setLevel(logging.WARNING)
+def make_thumbnail(path: Path, size: int = THUMB_SIZE) -> bytes:
+    """긴 변을 size로 줄인 JPEG (작은 이미지는 키우지 않는다)."""
+    with Image.open(path) as src:
+        im = src.convert("RGB")
+    im.thumbnail((size, size))
+    buf = io.BytesIO()
+    im.save(buf, "JPEG", quality=THUMB_QUALITY, optimize=True)
+    return buf.getvalue()
 
-    settings = get_settings()
+
+def r2_client(settings: Settings) -> Any:
+    """R2 S3 호환 클라이언트. 재시도(standard, 최대 3회)와 타임아웃은 botocore가 건다."""
+    return boto3.client(
+        "s3",
+        endpoint_url=f"https://{settings.r2_account_id}.r2.cloudflarestorage.com",
+        aws_access_key_id=settings.r2_access_key_id,
+        aws_secret_access_key=settings.r2_secret_access_key,
+        region_name="auto",
+        config=Config(
+            retries={"max_attempts": settings.http_max_retries + 1, "mode": "standard"},
+            connect_timeout=settings.http_timeout_s,
+            read_timeout=settings.http_timeout_s,
+            max_pool_connections=THUMB_WORKERS,
+        ),
+    )
+
+
+def upload_thumbnails(settings: Settings, scenes: Sequence[tuple[str, int]], force: bool) -> None:
+    """scenes = [(scene_id, tmdb_id)]. 올린 장면은 state와 scenes.r2_key에 기록한다."""
+    if not (settings.r2_account_id and settings.r2_access_key_id and settings.r2_secret_access_key):
+        logger.warning("R2 settings missing; thumbnail upload skipped")
+        return
+    target = f"{settings.r2_account_id}/{settings.r2_bucket}:{THUMB_SIZE}"
+    state = State()
+    todo = [s for s in scenes if force or not state.is_done(THUMB_STEP, s[0], target)]
+    logger.info("thumbnails: %d to upload (%d already done)", len(todo), len(scenes) - len(todo))
+    s3 = r2_client(settings)
+
+    def put(scene_id: str, tmdb_id: int) -> str:
+        s3.put_object(
+            Bucket=settings.r2_bucket,
+            Key=thumb_key(scene_id),
+            Body=make_thumbnail(scene_image_path(scene_id, tmdb_id)),
+            ContentType="image/jpeg",
+            CacheControl="public, max-age=31536000, immutable",
+        )
+        return scene_id
+
+    failed = 0
+    with ThreadPoolExecutor(THUMB_WORKERS) as pool:
+        futures = [pool.submit(put, *s) for s in todo]
+        for i, fut in enumerate(as_completed(futures), 1):
+            try:
+                state.mark_done(THUMB_STEP, fut.result(), target)  # sqlite는 메인 스레드에서만
+            except Exception:
+                failed += 1
+                logger.exception("thumbnail upload failed")
+            if i % 500 == 0:
+                logger.info("thumbnails: %d/%d", i, len(todo))
+    done = [s[0] for s in scenes if state.is_done(THUMB_STEP, s[0], target)]
+    state.close()
+
+    with SessionLocal() as session:
+        if done:
+            session.execute(update(Scene), [{"id": sid, "r2_key": thumb_key(sid)} for sid in done])
+            session.commit()
+    logger.info("thumbnails done: %d/%d uploaded, %d failed", len(done), len(scenes), failed)
+    if failed:
+        raise RuntimeError(f"{failed} thumbnail uploads failed; rerun to retry")
+
+
+def upload_vectors(args: argparse.Namespace, settings: Settings) -> None:
     alias, dim = settings.qdrant_scenes_alias, settings.embed_dim
     client = get_qdrant()
     state = State()
@@ -262,7 +337,29 @@ def main() -> None:
         db_scenes,
         status,
     )
-    logger.info("thumbnail upload to R2 skipped (added in Phase 5)")
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--limit", type=int, help="movies 앞 N편만 (s01과 같은 순서)")
+    parser.add_argument("--force", action="store_true", help="입력이 같아도 다시 적재")
+    parser.add_argument("--keep", type=int, default=2, help="남길 scenes_v{n} 개수(현재 포함)")
+    args = parser.parse_args()
+    setup_logging()
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+
+    settings = get_settings()
+    upload_vectors(args, settings)
+
+    with SessionLocal() as session:
+        limit_ids = select(Movie.id).order_by(Movie.id).limit(args.limit).scalar_subquery()
+        rows = session.execute(
+            select(Scene.id, Movie.tmdb_id)
+            .join(Movie, Scene.movie_id == Movie.id)
+            .where(Movie.id.in_(limit_ids))
+            .order_by(Scene.id)
+        ).all()
+    upload_thumbnails(settings, [(r[0], r[1]) for r in rows], args.force)
 
 
 if __name__ == "__main__":

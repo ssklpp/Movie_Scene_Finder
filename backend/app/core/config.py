@@ -42,6 +42,8 @@ class Settings(BaseSettings):
     r2_access_key_id: str = ""
     r2_secret_access_key: str = ""
     r2_bucket: str = "msf-thumbs"
+    # 버킷 공개 주소(r2.dev 또는 연결한 도메인). backend는 이것만 있으면 thumb_url을 채운다.
+    r2_public_url: str = ""
 
     # Search / agent
     confidence_threshold: float = 0.7
