@@ -12,6 +12,7 @@ from typing import Any
 
 from openai import OpenAI
 from openai.types.chat import ChatCompletion, ChatCompletionMessageParam
+from pydantic import BaseModel
 
 from app.core.config import get_settings
 from app.core.cost import usd_cost
@@ -33,6 +34,18 @@ def get_client() -> OpenAI:
     s = get_settings()
     return OpenAI(
         api_key=s.openai_api_key, timeout=s.http_timeout_s, max_retries=s.http_max_retries
+    )
+
+
+@lru_cache
+def get_local_vlm_client() -> OpenAI:
+    """로컬 vLLM 서버(OpenAI 호환). 비용 단가가 없으므로 비용은 0으로 기록된다."""
+    s = get_settings()
+    return OpenAI(
+        base_url=s.local_vlm_base_url,
+        api_key="local",
+        timeout=s.http_timeout_s,
+        max_retries=s.http_max_retries,
     )
 
 
@@ -76,6 +89,32 @@ def chat(
         started,
     )
     return resp, stats
+
+
+def parse[T: BaseModel](
+    messages: list[ChatCompletionMessageParam],
+    response_format: type[T],
+    model: str | None = None,
+    client: OpenAI | None = None,
+    **kwargs: Any,
+) -> tuple[T | None, CallStats]:
+    """구조화 출력(JSON 스키마). 모델이 거부하면 None을 돌려준다.
+
+    출력이 스키마에 맞지 않거나 길이 제한에 걸리면 SDK가 예외를 던진다.
+    """
+    model = model or get_settings().llm_model_default
+    started = time.perf_counter()
+    resp = (client or get_client()).chat.completions.parse(
+        model=model, messages=messages, response_format=response_format, **kwargs
+    )
+    usage = resp.usage
+    stats = _record(
+        model,
+        usage.prompt_tokens if usage else 0,
+        usage.completion_tokens if usage else 0,
+        started,
+    )
+    return resp.choices[0].message.parsed, stats
 
 
 def embed(

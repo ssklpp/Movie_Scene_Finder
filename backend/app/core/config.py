@@ -21,7 +21,9 @@ class Settings(BaseSettings):
     model_prices_usd_per_1m: dict[str, tuple[float, float]] = {}
 
     # Caption backend
-    caption_backend: Literal["local", "openai_batch"] = "local"
+    # local: vLLM(LOCAL_VLM_*), openai: LLM_MODEL_DEFAULT 실시간 호출,
+    # openai_batch: Batch API(미구현)
+    caption_backend: Literal["local", "openai", "openai_batch"] = "local"
     local_vlm_base_url: str = "http://localhost:8001/v1"
     local_vlm_model: str = ""
     caption_model_version: str = ""

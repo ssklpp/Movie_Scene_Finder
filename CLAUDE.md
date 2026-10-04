@@ -49,7 +49,20 @@ Python은 항상 `uv run`으로 실행한다(Python 3.12로 고정하고 시스�
 - s02는 backdrop만 받는다(TMDB 영화에는 still이 없다). s03의 pHash 중복 기준은 SPEC의 8이 아니라 **20**이다. backdrop에 자르기·확대·색 보정 사본이 많아 8로는 거의 걸러지지 않았다(4,446장 → 8: 4,242행, 20: 3,852행). backdrop 중 홍보용 포스터 이미지가 많으니 Phase 2 s05 검수에서 비율을 확인한다.
 - Kiwi 사용자 사전은 `uv run python -m pipeline.build_user_dict`로 만든다(`pipeline/data/user_dict.txt`, 제목 + 영화별 주요 배우 10명·감독의 한글 이름). 띄어 쓴 제목과 배역 이름(영어)은 넣지 않는다. 이 파일은 git에서 빠지지만 backend 질의 토큰화에도 필요하므로, Phase 5 배포 때 전달 방법을 정해야 한다. `kiwipiepy`는 타입 정보가 없어 mypy override로 제외했다.
 - human 골든셋: 지인 입력 `eval/datasets/human_v1.csv`(안내문 `eval/human_guide.md`, 영화 목록 `movie_list_v1.csv`)를 `uv run python -m eval.human_dataset build`로 `human_v1.jsonl`로 바꾼다. 레코드에는 SPEC 필드 `answer_movie_id`(movies.id) 외에 `answer_tmdb_id`도 있다. DB를 새로 만들면 movies.id가 바뀔 수 있으니 평가 시 정답은 `answer_tmdb_id` 기준으로 맞춘다.
-- 로컬 VLM은 `scripts/run_vlm.sh`로 띄운다(vLLM은 프로젝트 venv가 아닌 `~/.venvs/vllm`, vllm 0.30.0). 시작에 약 100초 걸린다.
+- **캡션 모델은 `gpt-6-luna`로 결정했다(2026-10-04, `CAPTION_BACKEND=openai`, model_version `gpt-6-luna-p1`).** 같은 무작위 100장(`s04 --sample 100 --seed 0`)으로 로컬 AWQ 4비트와 비교한 결과이며, SPEC E2(캡션 모델 비교)의 결과로 쓴다.
+
+  | 항목 | 로컬 AWQ 4비트 | gpt-6-luna |
+  | --- | --- | --- |
+  | 성공 | 99/100 (1장 출력 반복으로 한도 초과) | 100/100 |
+  | caption_ko 40~120자 | 91 | 100 |
+  | 평균 길이 / 평균 물건 수 | 52자 / 4.7개 | 66자 / 4.3개 |
+  | 인물 이름 사용 | 1건("스파이더맨") | 0건 |
+  | 처리량(동시 요청) | 1.74초/장(3개) | 0.42초/장(8개) |
+  | 토큰(입력/출력, 100장) | 129,690 / 22,470 | 174,300 / 25,444 |
+  | 비용 | 0 | 100장 $0.030, 전체 3,852장 약 $1.2 |
+
+  로컬 모델은 프롬프트 예시 문구("단발머리 소녀", "거인")를 실제 장면과 무관하게 베끼거나 단어가 깨지는("캐노eing") 문제가 있었다. gpt-6-luna는 추론 모델이라 `max_tokens`·`temperature`를 거부하므로 `reasoning_effort="low"`, `max_completion_tokens=2000`으로 호출한다(s04 `backend_config`). Batch API(반값)는 비용 차이가 작아 구현하지 않았다. 비교 결과 파일은 `reports/captions_cmp_*.jsonl`(git 제외)이다.
+- 로컬 VLM은 E2 재실험용으로 남겨 둔다. `scripts/run_vlm.sh`로 띄운다(vLLM은 프로젝트 venv가 아닌 `~/.venvs/vllm`, vllm 0.30.0). 시작에 약 100초 걸린다.
   - 모델은 SPEC의 원본 `Qwen/Qwen3-VL-4B-Instruct`가 아니라 **AWQ 4비트 양자화본 `cyankiwi/Qwen3-VL-4B-Instruct-AWQ-4bit`**다. 원본(8.9GB)은 VRAM에 안 들어가고, 공식 FP8(5.7GiB)은 최대 길이 3,072로 줄여야 했으며 시작 중 WSL이 재시작됐다. AWQ 4비트는 SPEC 설정(4,096, 0.85) 그대로 뜨고 KV 캐시 1.89GiB가 남는다. 캡션 1장 약 1~2초, 입력 약 930토큰.
   - Windows 화면 표시가 VRAM을 쓴다. 브라우저·Discord·Steam 등을 끄면 약 0.5GB가 늘어난다.
   - WSL에 CUDA 툴킷(nvcc)이 없어 FlashInfer JIT 컴파일이 실패한다. 그래서 스크립트가 `VLLM_USE_FLASHINFER_SAMPLER=0`을 설정하고, `--kv-cache-dtype fp8`은 쓰지 않는다.
