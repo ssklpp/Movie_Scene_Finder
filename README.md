@@ -2,7 +2,7 @@
 
 기억나는 영화 장면을 글이나 사진으로 설명하면 어떤 영화인지 찾아 주는 검색 서비스입니다.
 
-> **개발 중입니다.** 지금은 Phase 2(캡셔닝과 Qdrant 적재)까지 구현되어 있고, 검색 API와 화면은 아직 없습니다.
+> **개발 중입니다.** 지금은 Phase 3(하이브리드 검색과 첫 평가)까지 구현되어 있고, 검색 API와 화면은 아직 없습니다.
 > 구현 순서와 상세 명세는 [SPEC.md](SPEC.md)를 따릅니다.
 
 ## 동작 방식
@@ -20,14 +20,24 @@
 | 0 | 저장소 구성, DB 스키마, CI | 완료 |
 | 1 | 영화·이미지 수집, 중복 제거, 형태소 분석 사전, 평가 질의 수집 | 완료 |
 | 2 | VLM 캡셔닝, Qdrant 적재 | 완료 |
-| 3 | 하이브리드 검색, 첫 평가 | 다음 단계 |
-| 4 | LangGraph 에이전트(재질문), API | 예정 |
+| 3 | 하이브리드 검색, 첫 평가 | 완료 |
+| 4 | LangGraph 에이전트(재질문), API | 다음 단계 |
 | 5 | 프론트엔드, 배포 | 예정 |
 | 6 | 실험, 문서화 | 예정 |
 
 지금까지 만든 데이터: 영화 300편(한국 영화 약 60편 포함), 이미지 4,446장, 중복을 걸러 낸 장면 3,852개와
 장면마다의 한국어 캡션(`gpt-6-luna`, 검증 실패 0.18%), Qdrant 색인(장면 3,852개, 줄거리 299편),
-사람이 직접 쓴 평가 질의 20개([작성 안내](eval/human_guide.md)).
+사람이 직접 쓴 평가 질의 20개([작성 안내](eval/human_guide.md)), 합성 평가 질의 300개.
+
+### 첫 평가 (E1, dev 합성 질의 200개, 질의 재작성·재질문 없이 검색만)
+
+| 검색 방식 | Recall@1 | Recall@5 | MRR |
+| --- | --- | --- | --- |
+| dense | 0.100 | 0.235 | 0.156 |
+| sparse (BM25) | 0.210 | 0.375 | 0.293 |
+| hybrid (RRF) | 0.205 | 0.410 | 0.286 |
+
+질의 재작성과 재질문(Phase 4)을 붙이기 전의 기준선입니다. 최종 수치는 Phase 6에서 test 데이터로 한 번 측정합니다.
 
 ## 기술 스택
 
@@ -77,6 +87,14 @@ uv run python -m pipeline.s08_upload            # Qdrant 적재, 별칭 scenes �
 - 다시 실행하면 처리한 항목은 건너뜁니다. 진행 상태는 `pipeline/data/state.sqlite`에 남습니다.
 - 수집한 이미지와 중간 결과(`pipeline/data/`)는 저장소에 올리지 않습니다.
 
+### 평가
+
+```bash
+uv run python -m eval.make_synthetic                      # 합성 질의 300개 (이미 저장소에 있음)
+uv run python -m eval.run_eval --config eval/configs/E1_hybrid.yaml --split dev --no-agent
+uv run python -m eval.report --experiment E1 --split dev  # 실험 비교표
+```
+
 ### 개발 명령
 
 ```bash
@@ -91,7 +109,7 @@ make dev                                                  # backend(:8000) + fro
 ```
 backend/    FastAPI 앱(app/), DB 모델, Alembic 마이그레이션, 검색 모듈(search/), 테스트
 pipeline/   오프라인 인덱싱 단계(s01~s08)와 공용 모듈(common/)
-eval/       평가 데이터셋(human 질의 20개)과 실험 설정
+eval/       평가 데이터셋(human 20개, synthetic 300개), 실험 설정, 평가 스크립트
 scripts/    로컬 VLM(vLLM) 실행 스크립트
 frontend/   Next.js 앱 (예정)
 SPEC.md     구현 명세

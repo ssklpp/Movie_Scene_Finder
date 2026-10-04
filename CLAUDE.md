@@ -6,10 +6,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 현재 상태
 
-- **현재 Phase: 3 (검색과 첫 평가)**. Phase 0·1·2 완료(2026-10-04).
+- **현재 Phase: 4 (에이전트와 API)**. Phase 0·1·2·3 완료(2026-10-04).
   - Phase 1 결과: movies 300편, 이미지 4,446장, scenes 3,852행, Kiwi 사용자 사전, human 질의 20개. KMDb 줄거리 보강은 API 키 발급 대기 중(완료 기준 밖).
   - Phase 2 결과: 캡션 3,852장(gpt-6-luna), 검증 실패 0.18%, 검수 50장 환각 0건, 로컬 Qdrant `scenes`(→ `scenes_v2`) 3,852 포인트 = scenes 행 수, `movies` 299 포인트.
-  - `search/sparse.py`와 `search/qdrant.py`는 s07·s08 때문에 이미 있다. Phase 3에서 남은 것은 `search/hybrid.py`·`aggregate.py`(§7.3~7.4), 합성 질의 300개, `run_eval.py`, E1이다. 원격 저장소: https://github.com/ssklpp/Movie_Scene_Finder. Phase 완료 기준(§12)을 통과하면 이 줄을 갱신한다.
+  - Phase 3 결과: `search/filters.py`·`hybrid.py`·`aggregate.py`, synthetic 300개, `eval/run_eval.py`·`report.py`, E1 결과표(아래 구현 메모). hybrid가 dev에서 dense보다 나음을 확인했다.
+  - Phase 4에 남은 것: `agent/`(§8), `search/confidence.py`·`clarify.py`와 단위 테스트, API(§9: SSE, 재개, 피드백, rate limit), 재질문 시뮬레이터와 E6.
+  - 원격 저장소: https://github.com/ssklpp/Movie_Scene_Finder. Phase 완료 기준(§12)을 통과하면 이 항목을 갱신한다.
 - 현재 Phase의 완료 기준을 통과하기 전에는 다음 Phase 코드를 만들지 않는다.
 - 저장소는 WSL 홈(`~/projects/movie-scene-finder`)에 있다. 모든 명령은 WSL2 셸에서 실행한다(`/mnt/c/...`나 Windows 쪽 Python·Node는 쓰지 않는다).
 - Python 프로젝트는 backend·pipeline·eval이 함께 쓰는 uv workspace 하나로 만든다(`requires-python = ">=3.12,<3.13"`, §12 Phase 0). §3 트리에 보이는 `backend/pyproject.toml`은 workspace 멤버다.
@@ -74,6 +76,9 @@ Python은 항상 `uv run`으로 실행한다(Python 3.12로 고정하고 시스�
 - s08: 컬렉션·벡터 이름(`scenes_v{n}`, `movies`, `dense`, `sparse_ko`, `plot_dense`, `plot_sparse_ko`)과 연대 키(`"2010s"`)는 `search/qdrant.py`에 있고 검색도 이것을 쓴다. 포인트 ID는 scene_id의 UUID5이며 scene_id는 payload에 있다. 입력 parquet가 같으면 건너뛰므로 다시 적재하려면 `--force`. 시험용으로 만든 `scenes_v1`(41개)은 다음 적재 때 정리된다.
 - `make index`는 s03 다음에 `build_user_dict`를 돌린다(s07 sparse 토큰화가 사전을 쓴다).
 - synthetic 질의(`eval/datasets/synthetic_v1.jsonl`, `uv run python -m eval.make_synthetic`): 영화마다 장면 1개 → 300개(dev 200 / test 100, seed 0), gpt-6.1-sol, 비용 $0.46. 원문 Kiwi 토큰 겹침 ≤ 50%(중간값 19.5%)를 코드로 확인한다. 일부러 틀린 세부의 46%가 색이다. 캡션을 바꿔 쓴 질의라 human보다 쉬우므로 최종 판단은 human 기준으로 한다.
+- 평가: `uv run python -m eval.run_eval --config eval/configs/E1_hybrid.yaml --split dev --no-agent` → `eval_runs` + `reports/eval_*.md`(1위가 아닌 질의 목록)·`.jsonl`(질의별 결과). 비교표는 `uv run python -m eval.report --experiment E1 --split dev`. 커밋 해시는 코드 변경이 남아 있으면 `-dirty`가 붙는다. `--limit`을 주면 `eval_runs`에 기록하지 않는다. 에이전트 평가는 Phase 4에서 추가한다.
+- **E1 결과(dev, synthetic 200, `--no-agent`, 2026-10-04)**: dense R@1 0.100 / R@5 0.235 / MRR 0.156, sparse 0.210 / 0.375 / 0.293, **hybrid 0.205 / 0.410 / 0.286**. p95 < 0.2초. hybrid가 dense 대비 약 2배이고 sparse와는 비슷하다. dense가 약한 이유는 파이프라인 문제가 아니다(저장 벡터·Qdrant·전수 계산 순위 일치를 확인했다). 많이 바꿔 쓴 구어체 질의에서 text-embedding-3-small의 원문 장면 유사도가 비슷한 다른 장면보다 낮다. 개선 후보: Phase 4 질의 재작성(rewrite), dense 모델, RRF k(Qdrant 기본은 1/(1+순위)), 홍보 이미지 제외. 이 실행은 평가 코드 커밋 전이라 `eval_runs`의 커밋 값(`9e4d7c4`)에 평가 코드가 없다.
+- test split(human 포함)은 SPEC대로 Phase 6 최종 측정 때 1회만 쓴다.
 - 로컬 VLM은 E2 재실험용으로 남겨 둔다. `scripts/run_vlm.sh`로 띄운다(vLLM은 프로젝트 venv가 아닌 `~/.venvs/vllm`, vllm 0.30.0). 시작에 약 100초 걸린다.
   - 모델은 SPEC의 원본 `Qwen/Qwen3-VL-4B-Instruct`가 아니라 **AWQ 4비트 양자화본 `cyankiwi/Qwen3-VL-4B-Instruct-AWQ-4bit`**다. 원본(8.9GB)은 VRAM에 안 들어가고, 공식 FP8(5.7GiB)은 최대 길이 3,072로 줄여야 했으며 시작 중 WSL이 재시작됐다. AWQ 4비트는 SPEC 설정(4,096, 0.85) 그대로 뜨고 KV 캐시 1.89GiB가 남는다. 캡션 1장 약 1~2초, 입력 약 930토큰.
   - Windows 화면 표시가 VRAM을 쓴다. 브라우저·Discord·Steam 등을 끄면 약 0.5GB가 늘어난다.
