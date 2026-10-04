@@ -48,6 +48,7 @@ Python은 항상 `uv run`으로 실행한다(Python 3.12로 고정하고 시스�
 - 프론트엔드는 Next.js 16이다. 코드를 쓰기 전에 `frontend/AGENTS.md`의 지시대로 `frontend/node_modules/next/dist/docs/`의 관련 문서를 먼저 읽는다.
 - s02는 backdrop만 받는다(TMDB 영화에는 still이 없다). s03의 pHash 중복 기준은 SPEC의 8이 아니라 **20**이다. backdrop에 자르기·확대·색 보정 사본이 많아 8로는 거의 걸러지지 않았다(4,446장 → 8: 4,242행, 20: 3,852행). backdrop 중 홍보용 포스터 이미지가 많으니 Phase 2 s05 검수에서 비율을 확인한다.
 - Kiwi 사용자 사전은 `uv run python -m pipeline.build_user_dict`로 만든다(`pipeline/data/user_dict.txt`, 제목 + 영화별 주요 배우 10명·감독의 한글 이름). 띄어 쓴 제목과 배역 이름(영어)은 넣지 않는다. 이 파일은 git에서 빠지지만 backend 질의 토큰화에도 필요하므로, Phase 5 배포 때 전달 방법을 정해야 한다. `kiwipiepy`는 타입 정보가 없어 mypy override로 제외했다.
+- human 골든셋: 지인 입력 `eval/datasets/human_v1.csv`(안내문 `eval/human_guide.md`, 영화 목록 `movie_list_v1.csv`)를 `uv run python -m eval.human_dataset build`로 `human_v1.jsonl`로 바꾼다. 레코드에는 SPEC 필드 `answer_movie_id`(movies.id) 외에 `answer_tmdb_id`도 있다. DB를 새로 만들면 movies.id가 바뀔 수 있으니 평가 시 정답은 `answer_tmdb_id` 기준으로 맞춘다.
 - vLLM은 프로젝트 venv가 아닌 WSL의 `~/.venvs/vllm`(vllm 0.30.0)에 별도로 설치되어 있다. 모델 가중치는 아직 받지 않았다.
 
 ## 반드시 지킬 규칙 (SPEC §0 요약)

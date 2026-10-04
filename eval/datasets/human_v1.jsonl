@@ -1,0 +1,20 @@
+{"id": "human-0001", "query": "마지막에 루키가 우승을 양보하는 장면이 인상깊었어", "image_path": null, "answer_movie_id": 91, "answer_tmdb_id": 911430, "source": "human", "split": "test", "version": "v1", "writer": "TW"}
+{"id": "human-0002", "query": "예전 친구들을 추억하는 장면이 기억이 남아", "image_path": null, "answer_movie_id": 131, "answer_tmdb_id": 447365, "source": "human", "split": "test", "version": "v1", "writer": "TW"}
+{"id": "human-0003", "query": "능력을 감추다가 산 속에서 얼음성을 만들며 노래를 부르는 모습이 기억나", "image_path": null, "answer_movie_id": 251, "answer_tmdb_id": 109445, "source": "human", "split": "test", "version": "v1", "writer": "TW"}
+{"id": "human-0004", "query": "기름에 절인 녀석을 화살로 쏴 처리하는 장면이 기억나", "image_path": null, "answer_movie_id": 168, "answer_tmdb_id": 1255, "source": "human", "split": "test", "version": "v1", "writer": "TW"}
+{"id": "human-0005", "query": "라면 끓이는 장면은 언제봐도 인상적이야", "image_path": null, "answer_movie_id": 113, "answer_tmdb_id": 508642, "source": "human", "split": "test", "version": "v1", "writer": "TW"}
+{"id": "human-0006", "query": "좀비들이 갑작스럽게 위를 쳐다보며 진화하면서 적응하는게 신기했어", "image_path": null, "answer_movie_id": 3, "answer_tmdb_id": 1375646, "source": "human", "split": "test", "version": "v1", "writer": "SM"}
+{"id": "human-0007", "query": "결투장에서 자기 자신의 소속을 밝히는 장면이 기억나", "image_path": null, "answer_movie_id": 161, "answer_tmdb_id": 98, "source": "human", "split": "test", "version": "v1", "writer": "SM"}
+{"id": "human-0008", "query": "반지하 집에서 휴대폰 신호를 받으려 창 밖으로 가던 장면", "image_path": null, "answer_movie_id": 13, "answer_tmdb_id": 496243, "source": "human", "split": "test", "version": "v1", "writer": "SM"}
+{"id": "human-0009", "query": "두 개의 큰 배에서 폭탄 스위치를 누를까 말까 고민하며 긴장감을 유지하던거", "image_path": null, "answer_movie_id": 47, "answer_tmdb_id": 155, "source": "human", "split": "test", "version": "v1", "writer": "SM"}
+{"id": "human-0010", "query": "반복되는 장면을 경험하며 당황하는 빌런", "image_path": null, "answer_movie_id": 287, "answer_tmdb_id": 284052, "source": "human", "split": "test", "version": "v1", "writer": "SM"}
+{"id": "human-0011", "query": "선한 역이던 주인공이 빌런으로 변하면서 끔직한 일을 벌이던거", "image_path": null, "answer_movie_id": 160, "answer_tmdb_id": 453395, "source": "human", "split": "test", "version": "v1", "writer": "JH"}
+{"id": "human-0012", "query": "암 치료하다가 무한 재생하는 몸이 되는 거", "image_path": null, "answer_movie_id": 299, "answer_tmdb_id": 293660, "source": "human", "split": "test", "version": "v1", "writer": "JH"}
+{"id": "human-0013", "query": "기존의 역할이 아니라 뜬금없이 과거의 역할을 맡아서 놀랐던거", "image_path": null, "answer_movie_id": 24, "answer_tmdb_id": 533535, "source": "human", "split": "test", "version": "v1", "writer": "JH"}
+{"id": "human-0014", "query": "피주머니를 달고 다니는 트럭 장면이 기억나", "image_path": null, "answer_movie_id": 82, "answer_tmdb_id": 76341, "source": "human", "split": "test", "version": "v1", "writer": "JH"}
+{"id": "human-0015", "query": "마지막 전쟁에서 인간과 오크와의 접전 장면", "image_path": null, "answer_movie_id": 42, "answer_tmdb_id": 122, "source": "human", "split": "test", "version": "v1", "writer": "JH"}
+{"id": "human-0016", "query": "다른 멀티버스에서 주인공들이 넘어와 만나는 장면", "image_path": null, "answer_movie_id": 35, "answer_tmdb_id": 634649, "source": "human", "split": "test", "version": "v1", "writer": "HJ"}
+{"id": "human-0017", "query": "사라졌던 주인공들이 되돌아오면서 모이는 장면", "image_path": null, "answer_movie_id": 9, "answer_tmdb_id": 299534, "source": "human", "split": "test", "version": "v1", "writer": "HJ"}
+{"id": "human-0018", "query": "잠입하기 위해서 며칠 동안 버티고 또 버티던거", "image_path": null, "answer_movie_id": 2, "answer_tmdb_id": 1368337, "source": "human", "split": "test", "version": "v1", "writer": "HJ"}
+{"id": "human-0019", "query": "전투기를 타고 뒤집어진채로 활강하던거", "image_path": null, "answer_movie_id": 66, "answer_tmdb_id": 361743, "source": "human", "split": "test", "version": "v1", "writer": "HJ"}
+{"id": "human-0020", "query": "자동차로 추격하면서 눈이 마주치는 장면", "image_path": null, "answer_movie_id": 8, "answer_tmdb_id": 1058424, "source": "human", "split": "test", "version": "v1", "writer": "HJ"}
