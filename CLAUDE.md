@@ -46,6 +46,7 @@ Python은 항상 `uv run`으로 실행한다(Python 3.12로 고정하고 시스�
 - ruff isort는 `app`, `pipeline`, `eval`을 first-party로 본다. `app`은 `backend/` 아래 패키지이며 workspace 멤버 `msf-backend`로 설치된다.
 - 마이그레이션은 모델을 바꾼 뒤 `cd backend && uv run alembic revision --autogenerate -m "..."`로 만들고, 생성 파일을 검토한다.
 - 프론트엔드는 Next.js 16이다. 코드를 쓰기 전에 `frontend/AGENTS.md`의 지시대로 `frontend/node_modules/next/dist/docs/`의 관련 문서를 먼저 읽는다.
+- s02는 backdrop만 받는다(TMDB 영화에는 still이 없다). s03의 pHash 중복 기준은 SPEC의 8이 아니라 **20**이다. backdrop에 자르기·확대·색 보정 사본이 많아 8로는 거의 걸러지지 않았다(4,446장 → 8: 4,242행, 20: 3,852행). backdrop 중 홍보용 포스터 이미지가 많으니 Phase 2 s05 검수에서 비율을 확인한다.
 - vLLM은 프로젝트 venv가 아닌 WSL의 `~/.venvs/vllm`(vllm 0.30.0)에 별도로 설치되어 있다. 모델 가중치는 아직 받지 않았다.
 
 ## 반드시 지킬 규칙 (SPEC §0 요약)

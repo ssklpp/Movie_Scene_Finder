@@ -3,7 +3,11 @@ name = "movie-scene-finder"
 version = "0.1.0"
 description = "장면 기억 검색기: workspace root (pipeline, eval)"
 requires-python = ">=3.12,<3.13"
-dependencies = ["msf-backend"]
+dependencies = [
+    "imagehash>=4.3.2",
+    "msf-backend",
+    "pillow>=12.3.0",
+]
 
 [dependency-groups]
 dev = [
