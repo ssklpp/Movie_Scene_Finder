@@ -211,7 +211,8 @@ def main() -> None:
     alias, dim = settings.qdrant_scenes_alias, settings.embed_dim
     client = get_qdrant()
     state = State()
-    key = f"{fingerprint(SCENES_PARQUET, MOVIES_PARQUET)}:limit={args.limit}"
+    # 같은 벡터라도 다른 Qdrant(로컬·클라우드)에 올렸는지는 따로 기록한다.
+    key = f"{fingerprint(SCENES_PARQUET, MOVIES_PARQUET)}:limit={args.limit}:{settings.qdrant_url}"
     aliases = {a.alias_name for a in client.get_aliases().aliases}
     if not args.force and alias in aliases and state.is_done(STEP, key):
         logger.info("s08: vectors unchanged since last upload; skipping (use --force)")
