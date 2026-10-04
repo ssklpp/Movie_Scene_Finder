@@ -11,20 +11,23 @@ logger = logging.getLogger(__name__)
 RETRY_STATUS = {429, 500, 502, 503, 504}
 
 
-def get_json(
+def get(
     client: httpx.Client,
     url: str,
     params: dict[str, Any] | None = None,
     max_retries: int = 3,
     backoff_s: float = 1.0,
-) -> Any:
-    """GET 요청 후 JSON을 돌려준다. 429·5xx·네트워크 오류는 1s, 2s, 4s 간격으로 재시도한다."""
+) -> httpx.Response:
+    """GET 요청. 429·5xx·네트워크 오류는 1s, 2s, 4s 간격으로 재시도한다.
+
+    그 밖의 4xx는 재시도하지 않고 바로 실패한다.
+    """
     for attempt in range(max_retries + 1):
         try:
             resp = client.get(url, params=params)
             if resp.status_code not in RETRY_STATUS:
                 resp.raise_for_status()
-                return resp.json()
+                return resp
             error: Exception = httpx.HTTPStatusError(
                 f"retryable status {resp.status_code}", request=resp.request, response=resp
             )
@@ -36,3 +39,13 @@ def get_json(
         logger.warning("GET %s failed (%s); retry %d in %.1fs", url, error, attempt + 1, delay)
         time.sleep(delay)
     raise AssertionError("unreachable")
+
+
+def get_json(
+    client: httpx.Client,
+    url: str,
+    params: dict[str, Any] | None = None,
+    max_retries: int = 3,
+    backoff_s: float = 1.0,
+) -> Any:
+    return get(client, url, params, max_retries, backoff_s).json()

@@ -2,7 +2,7 @@ from typing import Any
 
 import httpx
 
-from pipeline.common.http import get_json
+from pipeline.common.http import get, get_json
 
 BASE_URL = "https://api.themoviedb.org/3"
 IMAGE_BASE_URL = "https://image.tmdb.org/t/p"
@@ -17,6 +17,7 @@ class TmdbClient:
             headers={"Authorization": f"Bearer {read_token}"},
             timeout=timeout_s,
         )
+        self._image_client = httpx.Client(base_url=IMAGE_BASE_URL, timeout=timeout_s)
 
     def discover(self, page: int, **filters: Any) -> dict[str, Any]:
         params = {"language": "ko-KR", "page": page, "include_adult": "false", **filters}
@@ -28,5 +29,14 @@ class TmdbClient:
         result: dict[str, Any] = get_json(self._client, f"/movie/{tmdb_id}", params)
         return result
 
+    def movie_images(self, tmdb_id: int) -> dict[str, Any]:
+        """언어 구분 없이 모든 이미지. 각 항목의 `iso_639_1`이 None이면 글자 없는 이미지다."""
+        result: dict[str, Any] = get_json(self._client, f"/movie/{tmdb_id}/images")
+        return result
+
+    def download_image(self, file_path: str, size: str = "w1280") -> bytes:
+        return get(self._image_client, f"/{size}{file_path}").content
+
     def close(self) -> None:
         self._client.close()
+        self._image_client.close()
