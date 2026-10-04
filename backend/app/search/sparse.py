@@ -2,12 +2,15 @@
 
 한쪽의 토큰화나 가중치만 바꾸면 검색이 조용히 망가진다. 바꾸면 s07을 다시 돌려 다시 적재한다.
 
-- 토큰화: Kiwi + 사용자 사전(`pipeline/data/user_dict.txt`). 남길 품사 NNG, NNP, XR, VV, VA, SL, SN.
-  동사·형용사는 Kiwi가 어간으로 돌려준다. 영어(SL)는 소문자로 맞춘다.
+- 토큰화: Kiwi + 사용자 사전(`app/search/data/user_dict.txt`). 남길 품사 NNG, NNP, XR, VV, VA,
+  SL, SN. 동사·형용사는 Kiwi가 어간으로 돌려준다. 영어(SL)는 소문자로 맞춘다.
+  배포된 backend도 질의 토큰화에 사전을 써야 해서 저장소에 포함한다.
+  사전은 pipeline.build_user_dict가 만든다.
 - term id: mmh3.hash(token, signed=False)
 - 문서 값: tf * (k1 + 1) / (tf + k1 * (1 - b + b * dl / avgdl)), k1=1.2, b=0.75
 - 질의 값: 등장한 토큰마다 1.0. IDF는 Qdrant의 sparse modifier=IDF가 계산한다.
-- avgdl: s07이 컬렉션별로 계산해 `pipeline/data/bm25_stats.json`에 쓰고 backend가 읽는다.
+- avgdl: s07이 컬렉션별로 계산해 `pipeline/data/bm25_stats.json`에 쓴다. 질의 값이 1.0이라
+  backend는 avgdl이 필요 없다(SPEC은 backend가 읽는다고 했지만 실제로 쓰이지 않는다).
 """
 
 import json
@@ -27,7 +30,7 @@ from app.core.config import REPO_ROOT
 
 logger = logging.getLogger(__name__)
 
-USER_DICT_PATH = REPO_ROOT / "pipeline" / "data" / "user_dict.txt"
+USER_DICT_PATH = Path(__file__).resolve().parent / "data" / "user_dict.txt"
 BM25_STATS_PATH = REPO_ROOT / "pipeline" / "data" / "bm25_stats.json"
 KEEP_TAGS = frozenset({"NNG", "NNP", "XR", "VV", "VA", "SL", "SN"})
 K1 = 1.2

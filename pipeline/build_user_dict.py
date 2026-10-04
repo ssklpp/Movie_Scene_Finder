@@ -1,4 +1,7 @@
-"""Kiwi 사용자 사전(`pipeline/data/user_dict.txt`)을 영화 제목과 인물명으로 만든다 (SPEC §7.2).
+"""Kiwi 사용자 사전을 영화 제목과 인물명으로 만든다 (SPEC §7.2).
+
+사전 파일은 `backend/app/search/data/user_dict.txt`다. 배포된 backend도 질의 토큰화에 써야 해서
+저장소에 포함한다. 사전을 바꾸면 s07(sparse)을 다시 돌리고 s08로 다시 적재해야 검색이 맞는다.
 
 인물은 영화별 주요 배우와 감독의 한글 이름이다(TMDB credits, ko-KR). Kiwi 사용자 단어에는 공백을
 넣을 수 없어서, 띄어 쓴 이름은 두 글자 이상인 부분만 넣고 띄어 쓴 제목은 넣지 않는다. 제목을
@@ -19,13 +22,13 @@ from app.core.config import REPO_ROOT, get_settings
 from app.core.logging import setup_logging
 from app.db.models import Movie
 from app.db.session import SessionLocal
+from app.search.sparse import USER_DICT_PATH  # backend 질의 토큰화와 같은 파일
 from pipeline.common.tmdb import TmdbClient
 
 logger = logging.getLogger(__name__)
 
 DATA_DIR = REPO_ROOT / "pipeline" / "data"
 CREDITS_DIR = DATA_DIR / "credits"
-USER_DICT_PATH = DATA_DIR / "user_dict.txt"
 TOP_CAST = 10
 HANGUL_WORD = re.compile(r"^[가-힣]{2,}$")
 
