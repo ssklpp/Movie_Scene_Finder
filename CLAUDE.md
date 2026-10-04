@@ -6,7 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 현재 상태
 
-- **현재 Phase: 5 (프론트엔드와 배포)**. Phase 0·1·2·3·4 완료(2026-10-04).
+- **현재 Phase: 6 (실험, 문서화, 종료)**. Phase 0~5 완료(2026-10-05).
+  - Phase 6 진행(2026-10-05): E3·E4·E5·E7 dev 실험 완료(아래 구현 메모), E3 결과로 운영 검색 문서에 caption_en 추가. 사용자 결정: human 질의는 지인에게 30개 더 받아 50개, 이미지 평가 세트는 자동 생성 약 80장 + 모니터 촬영 약 20장(사용자가 촬영), E4는 MeCab-ko 제외. 남은 것: 이미지 세트, `/eval` 대시보드, human 50개, test 최종 측정 1회, README, 데모 영상, v1.0.0.
   - Phase 1 결과: movies 300편, 이미지 4,446장, scenes 3,852행, Kiwi 사용자 사전, human 질의 20개. KMDb 줄거리 보강은 API 키 발급 대기 중(완료 기준 밖).
   - Phase 2 결과: 캡션 3,852장(gpt-6-luna), 검증 실패 0.18%, 검수 50장 환각 0건, 로컬 Qdrant `scenes`(→ `scenes_v2`) 3,852 포인트 = scenes 행 수, `movies` 299 포인트.
   - Phase 3 결과: `search/filters.py`·`hybrid.py`·`aggregate.py`, synthetic 300개, `eval/run_eval.py`·`report.py`, E1 결과표(아래 구현 메모). hybrid가 dev에서 dense보다 나음을 확인했다.
@@ -82,6 +83,24 @@ Python은 항상 `uv run`으로 실행한다(Python 3.12로 고정하고 시스�
 - 평가: `uv run python -m eval.run_eval --config eval/configs/E1_hybrid.yaml --split dev --no-agent` → `eval_runs` + `reports/eval_*.md`(1위가 아닌 질의 목록)·`.jsonl`(질의별 결과). 비교표는 `uv run python -m eval.report --experiment E1 --split dev`. 커밋 해시는 코드 변경이 남아 있으면 `-dirty`가 붙는다. `--limit`을 주면 `eval_runs`에 기록하지 않는다. 에이전트 평가는 Phase 4에서 추가한다.
 - **E1 결과(dev, synthetic 200, `--no-agent`, 2026-10-04)**: dense R@1 0.100 / R@5 0.235 / MRR 0.156, sparse 0.210 / 0.375 / 0.293, **hybrid 0.205 / 0.410 / 0.286**. p95 < 0.2초. hybrid가 dense 대비 약 2배이고 sparse와는 비슷하다. dense가 약한 이유는 파이프라인 문제가 아니다(저장 벡터·Qdrant·전수 계산 순위 일치를 확인했다). 많이 바꿔 쓴 구어체 질의에서 text-embedding-3-small의 원문 장면 유사도가 비슷한 다른 장면보다 낮다. 개선 후보: Phase 4 질의 재작성(rewrite), dense 모델, RRF k(Qdrant 기본은 1/(1+순위)), 홍보 이미지 제외. 이 실행은 평가 코드 커밋 전이라 `eval_runs`의 커밋 값(`9e4d7c4`)에 평가 코드가 없다.
 - test split(human 포함)은 SPEC대로 Phase 6 최종 측정 때 1회만 쓴다.
+- 색인 변형 실험(`eval/variants.py`, E3·E4·E7): 운영 색인을 건드리지 않고 **로컬 Qdrant**에 `exp_{언어}_{토크나이저}_{차원}_scenes/_movies`를 만든다(`uv run python -m eval.variants build --doc-lang en|both --tokenizer kiwi|char2 --dim 512`). 평가 설정의 `index:`가 있으면 run_eval이 `activate()`로 Qdrant 주소·컬렉션·차원을 바꾸고 `sparse.tokenize`를 같은 토크나이저로 바꿔 끼운다. 줄거리 컬렉션 이름은 설정 `QDRANT_MOVIES_COLLECTION`(기본 movies). dense는 `pipeline/data/exp_dense_cache.parquet`에 캐시한다(키는 s07과 같아 운영 벡터를 재사용). 기준 변형이 E1 hybrid와 같은 값을 내는 것으로 장치를 확인했다. 평가 설정의 집계 가중치(`w_plot` 등)는 이제 에이전트 모드에도 적용된다(`apply_overrides`).
+- **E3·E4·E5·E7 결과(dev synthetic 200, 2026-10-05)**. 검색만(`--no-agent`), R@10 = 에이전트 후보 10편 안에 정답:
+
+  | 실험 | 설정 | R@1 | R@5 | MRR | R@10 | 에이전트 R@1 |
+  | --- | --- | --- | --- | --- | --- | --- |
+  | E3 문서 언어 | ko (이전 운영) | 0.205 | 0.410 | 0.286 | 0.51 | 0.860 |
+  | | en | 0.120 | 0.280 | 0.180 | 0.33 | - |
+  | | **ko + en (현재 운영)** | **0.255** | 0.420 | **0.327** | 0.53 | 0.880 |
+  | E4 토크나이저 | Kiwi + 사전 (운영) | 0.205 | 0.410 | 0.286 | 0.51 | - |
+  | | Kiwi | 0.205 | 0.415 | 0.286 | 0.51 | - |
+  | | 문자 2-gram | 0.160 | 0.370 | 0.253 | 0.465 | - |
+  | E5 W_PLOT | 0 | 0.220 | 0.420 | 0.302 | 0.545 | 0.885 |
+  | | **0.5 (운영)** | 0.205 | 0.410 | 0.286 | 0.51 | 0.870 |
+  | | 1.0 | 0.165 | 0.315 | 0.236 | 0.425 | - |
+  | E7 임베딩 차원 | **1536 (운영)** | 0.205 | 0.410 | 0.286 | 0.51 | - |
+  | | 512 | 0.190 | 0.365 | 0.267 | 0.465 | - |
+
+  결정(사용자 확인): E3은 ko + en으로 바꿨다(검색만 평가는 무작위성이 없어 +5%p가 실제 차이, 에이전트는 흔들림 범위지만 나빠지지 않음, 재질문 0.24 → 0.20). s06이 caption_en을 넣고 s07·s08을 로컬(`scenes_v3`)·클라우드(`scenes_v2`)에 다시 적재했다(임베딩 $0.013). 바꾼 뒤 E1 hybrid(클라우드) R@1 0.255 / R@5 0.415 / MRR 0.326. E4 사용자 사전은 synthetic에 제목·인물명이 없어 차이가 없지만 사람 질의를 위해 유지한다. E5는 0이 조금 낫지만 흔들림 범위이고 synthetic이 캡션을 바꿔 쓴 질의라 줄거리에 불리해 0.5를 유지한다(이미지에 없는 장면은 줄거리로만 찾는다). E7은 512가 R@5 −4.5%p라 1536 유지. 에이전트 R@1은 같은 설정도 실행마다 0.860~0.885로 흔들린다. 각 결과의 run id는 `eval.report --experiment E3|E4|E5|E7`로 본다.
 - 에이전트(`app/agent/`)에서 SPEC과 다르게 정한 것(사용자 확인, 2026-10-04):
   - SPEC의 clarify를 `ask`(질문 만들기)와 `clarify`(`interrupt()`·답 반영)로 나눴다. LangGraph는 재개할 때 interrupt가 있는 노드를 처음부터 다시 실행하므로, 처음에 질문 문장을 LLM으로 만들 때 한 노드에 두면 LLM이 다시 불리고 질문이 바뀌었다. 지금은 질문이 고정 문장이지만 구조는 유지한다.
   - `langchain-openai`를 쓰지 않는다. 모든 LLM 호출은 `core/llm.py` 래퍼(비용 기록)를 거친다.

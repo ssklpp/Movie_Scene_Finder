@@ -132,6 +132,7 @@ DATABASE_URL=postgresql+psycopg://app:app@localhost:5432/msf
 QDRANT_URL=http://localhost:6333
 QDRANT_API_KEY=
 QDRANT_SCENES_ALIAS=scenes
+QDRANT_MOVIES_COLLECTION=movies
 R2_ACCOUNT_ID=
 R2_ACCESS_KEY_ID=
 R2_SECRET_ACCESS_KEY=
@@ -236,7 +237,7 @@ class SceneCaption(BaseModel):
 | (build_user_dict) | movies | 제목 + 영화별 주요 배우 10명·감독의 한글 이름으로 Kiwi 사용자 사전 생성. s03 다음에 실행 | `backend/app/search/data/user_dict.txt` (저장소 포함, 배포 backend도 사용) |
 | s04_caption | scenes | `CAPTION_BACKEND`에 따라 로컬 vLLM 또는 OpenAI 실시간 API로 `SceneCaption` 생성(동시 3개, `max_completion_tokens=1200`, TPM 한도 때문). 두 백엔드 모두 OpenAI 호환 클라이언트 사용. 프롬프트는 `search/caption.py`(이미지 질의와 공유) | `scenes.caption_*`, `tags` |
 | s05_validate | scenes | Pydantic 검증 실패 재시도(최대 2회), 실패 목록 출력, 무작위 50개 검수용 CSV 생성 | `reports/caption_review.csv` |
-| s06_build_docs | scenes, movies | 검색 문서 = caption_ko + setting + objects + 장르·연대 (제목 제외, 제목 로고가 있을 수 있어 text_in_frame도 제외) | `pipeline/data/search_docs.jsonl` |
+| s06_build_docs | scenes, movies | 검색 문서 = caption_ko + caption_en + setting + objects + 장르·연대 (caption_en은 E3 결과로 추가. 제목 제외, 제목 로고가 있을 수 있어 text_in_frame도 제외) | `pipeline/data/search_docs.jsonl` |
 | s07_embed | search_text, plot_ko | dense: OpenAI 임베딩(배치 100) / sparse: §7.2 BM25 가중치 | 벡터 파일(parquet) |
 | s08_upload | 벡터, payload | 새 컬렉션 `scenes_v{n}` 생성 → upsert(256개 배치) → alias `scenes` 교체, 썸네일(긴 변 512px JPEG) R2 `thumbs/{scene_id}.jpg` 업로드 | Qdrant, R2, `scenes.r2_key` |
 
