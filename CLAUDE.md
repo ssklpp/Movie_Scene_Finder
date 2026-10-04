@@ -73,6 +73,7 @@ Python은 항상 `uv run`으로 실행한다(Python 3.12로 고정하고 시스�
 - s07 출력은 `pipeline/data/vectors/{scenes,movies}.parquet`. dense는 "모델|차원|문서" 해시로 캐시해 바뀐 문서만 다시 임베딩한다. 전체 임베딩 비용 약 $0.012. 줄거리가 없는 영화 1편은 `movies`에서 빠진다(p_m = 0).
 - s08: 컬렉션·벡터 이름(`scenes_v{n}`, `movies`, `dense`, `sparse_ko`, `plot_dense`, `plot_sparse_ko`)과 연대 키(`"2010s"`)는 `search/qdrant.py`에 있고 검색도 이것을 쓴다. 포인트 ID는 scene_id의 UUID5이며 scene_id는 payload에 있다. 입력 parquet가 같으면 건너뛰므로 다시 적재하려면 `--force`. 시험용으로 만든 `scenes_v1`(41개)은 다음 적재 때 정리된다.
 - `make index`는 s03 다음에 `build_user_dict`를 돌린다(s07 sparse 토큰화가 사전을 쓴다).
+- synthetic 질의(`eval/datasets/synthetic_v1.jsonl`, `uv run python -m eval.make_synthetic`): 영화마다 장면 1개 → 300개(dev 200 / test 100, seed 0), gpt-6.1-sol, 비용 $0.46. 원문 Kiwi 토큰 겹침 ≤ 50%(중간값 19.5%)를 코드로 확인한다. 일부러 틀린 세부의 46%가 색이다. 캡션을 바꿔 쓴 질의라 human보다 쉬우므로 최종 판단은 human 기준으로 한다.
 - 로컬 VLM은 E2 재실험용으로 남겨 둔다. `scripts/run_vlm.sh`로 띄운다(vLLM은 프로젝트 venv가 아닌 `~/.venvs/vllm`, vllm 0.30.0). 시작에 약 100초 걸린다.
   - 모델은 SPEC의 원본 `Qwen/Qwen3-VL-4B-Instruct`가 아니라 **AWQ 4비트 양자화본 `cyankiwi/Qwen3-VL-4B-Instruct-AWQ-4bit`**다. 원본(8.9GB)은 VRAM에 안 들어가고, 공식 FP8(5.7GiB)은 최대 길이 3,072로 줄여야 했으며 시작 중 WSL이 재시작됐다. AWQ 4비트는 SPEC 설정(4,096, 0.85) 그대로 뜨고 KV 캐시 1.89GiB가 남는다. 캡션 1장 약 1~2초, 입력 약 930토큰.
   - Windows 화면 표시가 VRAM을 쓴다. 브라우저·Discord·Steam 등을 끄면 약 0.5GB가 늘어난다.
