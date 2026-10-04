@@ -79,6 +79,15 @@ Python은 항상 `uv run`으로 실행한다(Python 3.12로 고정하고 시스�
 - 평가: `uv run python -m eval.run_eval --config eval/configs/E1_hybrid.yaml --split dev --no-agent` → `eval_runs` + `reports/eval_*.md`(1위가 아닌 질의 목록)·`.jsonl`(질의별 결과). 비교표는 `uv run python -m eval.report --experiment E1 --split dev`. 커밋 해시는 코드 변경이 남아 있으면 `-dirty`가 붙는다. `--limit`을 주면 `eval_runs`에 기록하지 않는다. 에이전트 평가는 Phase 4에서 추가한다.
 - **E1 결과(dev, synthetic 200, `--no-agent`, 2026-10-04)**: dense R@1 0.100 / R@5 0.235 / MRR 0.156, sparse 0.210 / 0.375 / 0.293, **hybrid 0.205 / 0.410 / 0.286**. p95 < 0.2초. hybrid가 dense 대비 약 2배이고 sparse와는 비슷하다. dense가 약한 이유는 파이프라인 문제가 아니다(저장 벡터·Qdrant·전수 계산 순위 일치를 확인했다). 많이 바꿔 쓴 구어체 질의에서 text-embedding-3-small의 원문 장면 유사도가 비슷한 다른 장면보다 낮다. 개선 후보: Phase 4 질의 재작성(rewrite), dense 모델, RRF k(Qdrant 기본은 1/(1+순위)), 홍보 이미지 제외. 이 실행은 평가 코드 커밋 전이라 `eval_runs`의 커밋 값(`9e4d7c4`)에 평가 코드가 없다.
 - test split(human 포함)은 SPEC대로 Phase 6 최종 측정 때 1회만 쓴다.
+- 에이전트(`app/agent/`)에서 SPEC과 다르게 정한 것(사용자 확인, 2026-10-04):
+  - SPEC의 clarify를 `ask`(질문 문장 LLM 생성)와 `clarify`(`interrupt()`·답 반영)로 나눴다. LangGraph는 재개할 때 interrupt가 있는 노드를 처음부터 다시 실행하므로, 한 노드에 두면 LLM이 다시 불리고 질문이 바뀐다.
+  - `langchain-openai`를 쓰지 않는다. 모든 LLM 호출은 `core/llm.py` 래퍼(비용 기록)를 거친다.
+  - answer 노드는 LLM을 부르지 않고 verify의 `reason`을 추천 이유로 쓴다.
+  - 캡션 스키마·프롬프트는 `search/caption.py`에 있다(색인 s04와 이미지 질의가 같은 프롬프트를 쓴다).
+  - rewrite의 soft_filters는 OpenAI strict 구조화 출력이 자유 키 dict를 받지 않아 고정 필드(`SoftFilterFields`)로 받고, 형식이 틀린 값은 코드에서 버린다.
+  - verify 입력에 후보의 제목·연도를 준다(LLM의 영화 지식 활용). 대신 "제목 글자로 점수를 올리지 말 것", "흔한 장면이면 0.5 이하"를 프롬프트에 넣었다. 넣기 전에는 "누군가를 쫓아가는 장면"에 "추격자"를 0.88로 과신했다.
+- 체크포인트 상태의 pydantic 모델은 `agent/state.py`의 `STATE_MODELS`에 등록해야 복원된다(`checkpoint.make_serde`). 새 모델을 상태에 넣으면 여기에도 추가한다.
+- 실제 실행 관찰(2026-10-04): 질의당 비용 약 $0.0006(재질문 2회 세션 약 $0.0018). **지연시간이 SPEC 목표를 넘는다**: verify 1회 약 7초, rewrite 1.5~3초 → 첫 응답 약 10초, 재질문마다 7~10초 추가. 서버 재시작 후 재개(새 연결·새 그래프)는 동작을 확인했다. 기생충 "물난리" 질의처럼 수집 이미지와 줄거리에 없는 장면은 재질문 후에도 후보에 들지 않는다.
 - 로컬 VLM은 E2 재실험용으로 남겨 둔다. `scripts/run_vlm.sh`로 띄운다(vLLM은 프로젝트 venv가 아닌 `~/.venvs/vllm`, vllm 0.30.0). 시작에 약 100초 걸린다.
   - 모델은 SPEC의 원본 `Qwen/Qwen3-VL-4B-Instruct`가 아니라 **AWQ 4비트 양자화본 `cyankiwi/Qwen3-VL-4B-Instruct-AWQ-4bit`**다. 원본(8.9GB)은 VRAM에 안 들어가고, 공식 FP8(5.7GiB)은 최대 길이 3,072로 줄여야 했으며 시작 중 WSL이 재시작됐다. AWQ 4비트는 SPEC 설정(4,096, 0.85) 그대로 뜨고 KV 캐시 1.89GiB가 남는다. 캡션 1장 약 1~2초, 입력 약 930토큰.
   - Windows 화면 표시가 VRAM을 쓴다. 브라우저·Discord·Steam 등을 끄면 약 0.5GB가 늘어난다.

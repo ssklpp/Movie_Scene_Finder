@@ -19,3 +19,6 @@ frontend/out/
 *.mkv
 *.webm
 *.srt
+
+# 질의 이미지 업로드 (Phase 5에서 R2로 바꾼다)
+backend/data/
