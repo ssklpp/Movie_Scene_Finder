@@ -1,0 +1,5 @@
+# E1: 검색 방식 비교 (SPEC §11). 집계 가중치는 .env 기본값을 쓴다.
+experiment: E1
+name: hybrid
+mode: hybrid
+agent: false
