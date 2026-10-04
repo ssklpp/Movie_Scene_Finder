@@ -71,10 +71,7 @@ class Fakes:
         if fmt is VerifyOutput:
             self.verify_calls += 1
             scores = self.verify_scores(self.verify_calls)
-            items = [
-                Verified(movie_id=m, score=s, reason=f"이유 {m}", evidence_scene_ids=[])
-                for m, s in scores.items()
-            ]
+            items = [Verified(movie_id=m, score=s, reason=f"이유 {m}") for m, s in scores.items()]
             return VerifyOutput(items=items), STATS
         if fmt is SceneCaption:
             return SceneCaption(

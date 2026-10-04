@@ -15,12 +15,15 @@ GAP_SCALE = 0.3
 
 
 class Verified(BaseModel):
-    """LLM이 영화 하나에 대해 돌려주는 검증 결과."""
+    """LLM이 영화 하나에 대해 돌려주는 검증 결과.
+
+    SPEC §7.5의 evidence_scene_ids는 받지 않는다. 근거 장면은 검색 결과(MovieCandidate.evidence)에서
+    가져오고, 이 값을 쓰는 곳이 없는데 출력 토큰의 큰 몫(약 30%)을 차지해 응답이 느려졌다.
+    """
 
     movie_id: int
     score: float  # 0~1
-    reason: str
-    evidence_scene_ids: list[str]
+    reason: str  # 점수 상위 5편만 채우고 나머지는 빈 문자열(화면에는 5편만 나간다)
 
 
 class VerifyOutput(BaseModel):
@@ -51,7 +54,7 @@ def rerank(
     for c in candidates:
         v = by_id.get(c.movie_id)
         if v is None:
-            v = Verified(movie_id=c.movie_id, score=0.0, reason="", evidence_scene_ids=[])
+            v = Verified(movie_id=c.movie_id, score=0.0, reason="")
         else:
             v = v.model_copy(update={"score": clamp01(v.score)})
         ranked.append(RankedCandidate(candidate=c, verified=v))

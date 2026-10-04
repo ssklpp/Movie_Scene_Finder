@@ -90,6 +90,9 @@ Python은 항상 `uv run`으로 실행한다(Python 3.12로 고정하고 시스�
 - API(§9): `agent/runtime.py`가 그래프를 돌려 SSE 이벤트를 만들고 세션을 기록한다(FastAPI 없이 테스트 가능). 서버는 시작할 때 Postgres 연결 풀 체크포인터로 그래프를 한 번 만든다(`main.py` lifespan). `question` 이벤트에는 SPEC 필드 외에 화면용 `labels`가 있다. `sessions.latency_ms`는 노드 처리 시간 합(사용자가 답을 기다린 시간 제외). rate limit은 `/search`만 센다. 테스트는 `app.state.runtime`에 메모리 체크포인터 실행기를 넣고 TestClient를 `with` 없이 써서 lifespan을 건너뛴다. DB 테스트는 Postgres가 없으면 skip되고 CI는 Postgres 서비스로 돌린다.
 - 에이전트 평가: `uv run python -m eval.run_eval --config eval/configs/E6_turns2.yaml --split dev`(설정 `agent: true`, `--no-agent` 없이). 메모리 체크포인터로 돌리고 재질문은 `eval/simulator.py`가 정답 영화 속성으로 답한다(값이 선택지에 없으면 "모르겠어요"). 사람이 속성을 정확히 기억한다는 가정이라 실제보다 유리하다. 질의를 4개씩 동시에 돌린다(`--workers`). p95는 요청(invoke) 1회 기준이며 동시 실행 탓에 다소 높게 잡힌다. `clarify_success` = 재질문을 한 질의 중 최종 1위가 정답인 비율(SPEC에 정의가 없어 정함).
 - **E6 결과(dev, synthetic 200, 시뮬레이터, 2026-10-04)**: turns0 R@1 0.815 / R@5 0.820 / MRR 0.818, turns1 0.825 / 0.840 / 0.832(평균 재질문 0.14, clarify_success 0.31), **turns2 0.860 / 0.875 / 0.867(평균 재질문 0.28, clarify_success 0.42)**. 요청 p95 10.2~11.1초, 질의당 $0.00065~0.00082(약 1원). 에이전트가 검색만 할 때(E1 hybrid R@1 0.205)보다 크게 낫다(재작성 + 영화 지식을 쓰는 검증). R@1과 R@5가 거의 같아, 못 찾는 질의는 대부분 정답이 후보 10편에 들지 않은 경우다. 이 실행의 커밋 값은 `ffc08d5-dirty`(평가 코드 커밋 전)다.
+- 지연시간(2026-10-04 측정, dev 20개 순차): 요청 1회의 75%가 verify이고 그 시간은 **출력 토큰 수**에 비례한다(초당 약 90~120토큰, 추론 토큰은 적다). 그래서 verify 출력에서 SPEC의 `evidence_scene_ids`를 뺐고(쓰는 곳이 없었다), reason은 점수 상위 5편만 50자 이내로 쓰게 했다. 서버 시작 때 `agent/warmup.py`가 Kiwi·영화 목록·Qdrant·OpenAI 연결을 미리 준비한다(첫 요청 약 3초 단축).
+  - 결과: verify 출력 740 → 390토큰, verify 6.2 → 4.3초, 요청 중간값 8.5 → 6.8초, p95 10.6 → 9.1초(순차). E6 turns2 재측정: R@1 0.860 → 0.840, R@5 0.875 → 0.860, 요청 p95(동시 4) 10.5 → 8.8초, 질의당 $0.00082 → $0.00064. 질의별로는 1위가 11개 틀려지고 7개 맞아져 LLM 응답의 무작위성 범위로 보이지만, 작은 하락이 없다고 확인하지는 않았다.
+  - 아직 p95 > 8초다. 재질문으로 끝나는 첫 요청(재작성 2.2 + verify 4.3 + 질문 생성 1.2~2.5초)이 꼬리를 만든다. 남은 후보: 재질문 문장 고정(SPEC §7.6과 다름), rewrite·verify에 `reasoning_effort="none"`(gpt-6-luna는 `minimal`은 거부하고 `none`은 받는다, SPEC "low"와 다름).
 - 체크포인트 상태의 pydantic 모델은 `agent/state.py`의 `STATE_MODELS`에 등록해야 복원된다(`checkpoint.make_serde`). 새 모델을 상태에 넣으면 여기에도 추가한다.
 - 실제 실행 관찰(2026-10-04): 질의당 비용 약 $0.0006(재질문 2회 세션 약 $0.0018). **지연시간이 SPEC 목표를 넘는다**: verify 1회 약 7초, rewrite 1.5~3초 → 첫 응답 약 10초, 재질문마다 7~10초 추가. 서버 재시작 후 재개(새 연결·새 그래프)는 동작을 확인했다. 기생충 "물난리" 질의처럼 수집 이미지와 줄거리에 없는 장면은 재질문 후에도 후보에 들지 않는다.
 - 로컬 VLM은 E2 재실험용으로 남겨 둔다. `scripts/run_vlm.sh`로 띄운다(vLLM은 프로젝트 venv가 아닌 `~/.venvs/vllm`, vllm 0.30.0). 시작에 약 100초 걸린다.
@@ -117,6 +120,7 @@ Python은 항상 `uv run`으로 실행한다(Python 3.12로 고정하고 시스�
 | `feat` | 새 기능 (예: 파이프라인 단계, API 엔드포인트) |
 | `fix` | 버그 수정 |
 | `refactor` | 동작은 같고 구조 개선 |
+| `perf` | 성능(지연시간·비용) 개선 |
 | `test` | 테스트만 추가·수정 |
 | `ci` | GitHub Actions |
 | `docs` | 문서만 (`CLAUDE.md`, `SPEC.md`, README) |

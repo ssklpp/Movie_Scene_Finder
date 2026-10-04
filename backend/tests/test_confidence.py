@@ -19,7 +19,7 @@ def cand(movie_id: int, score: float = 1.0) -> MovieCandidate:
 
 
 def ver(movie_id: int, score: float) -> Verified:
-    return Verified(movie_id=movie_id, score=score, reason="r", evidence_scene_ids=[])
+    return Verified(movie_id=movie_id, score=score, reason="r")
 
 
 @pytest.mark.parametrize(

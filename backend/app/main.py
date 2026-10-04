@@ -16,9 +16,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # 서버가 뜰 때 Postgres 체크포인터(연결 풀)와 그래프를 한 번 만든다.
     from app.agent.checkpoint import pooled_checkpointer
     from app.agent.runtime import AgentRuntime, SqlSessionStore
+    from app.agent.warmup import warm_up
 
     saver, pool = pooled_checkpointer()
     app.state.runtime = AgentRuntime(saver, SqlSessionStore())
+    warm_up()
     try:
         yield
     finally:
