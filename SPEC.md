@@ -45,15 +45,15 @@
 | 개발 환경 | Windows + WSL2(Ubuntu). 저장소·Docker·vLLM·명령 실행은 모두 WSL 안에서 |
 | 언어·패키지 | Python 3.12 (uv로 프로젝트 고정, 시스템의 3.14는 사용하지 않음) + uv, Node.js 22 LTS + pnpm |
 | 백엔드 | FastAPI, Pydantic v2, pydantic-settings, SQLAlchemy 2 + Alembic, sse-starlette, slowapi |
-| 에이전트 | LangGraph (PostgresSaver 체크포인터), langchain-openai |
+| 에이전트 | LangGraph (PostgresSaver 체크포인터). LLM 호출은 `langchain-openai` 없이 `core/llm.py` 래퍼(OpenAI SDK)로 한다 |
 | LLM | 기본 `gpt-6-luna` (reasoning effort low), 고품질 폴백 `gpt-6.1-sol` |
-| VLM | 대량 캡셔닝: 로컬 `Qwen/Qwen3-VL-4B-Instruct` (vLLM, OpenAI 호환 엔드포인트) 또는 `gpt-6-luna` Batch API / 실시간 이미지: `gpt-6-luna` |
+| VLM | 대량 캡셔닝: `gpt-6-luna` 실시간 API(E2 비교로 결정). 비교용 로컬 `cyankiwi/Qwen3-VL-4B-Instruct-AWQ-4bit` (vLLM, OpenAI 호환 엔드포인트. 원본 Qwen3-VL-4B는 VRAM 8GB에 들어가지 않음) / 실시간 이미지: `gpt-6-luna` |
 | 임베딩 | `text-embedding-3-small` (1536차원) |
 | 형태소 분석 | kiwipiepy (사용자 사전: 영화 제목·인물명) |
 | Vector DB | Qdrant (로컬 Docker / 배포 Qdrant Cloud 무료 1GB) |
-| RDB | PostgreSQL 16 (로컬 Docker / 배포 Railway) |
+| RDB | PostgreSQL 16 (로컬 Docker) / 배포 Railway(기본 버전 18, 쓰는 기능은 같음) |
 | 이미지 처리 | Pillow, imagehash, (선택) ffmpeg + PySceneDetect |
-| 파일 저장 | Cloudflare R2 (썸네일만) |
+| 파일 저장 | Cloudflare R2 (썸네일만, r2.dev 공개 주소로 제공) |
 | 프론트엔드 | Next.js (App Router) + TypeScript + Tailwind |
 | 관측·평가 | LangSmith, pytest |
 | 배포 | Railway (backend + Postgres), Vercel (frontend), Qdrant Cloud |
@@ -114,12 +114,14 @@ LLM_MODEL_DEFAULT=gpt-6-luna
 LLM_MODEL_STRONG=gpt-6.1-sol
 EMBED_MODEL=text-embedding-3-small
 EMBED_DIM=1536
+# 모델별 단가 (USD / 1M 토큰, [input, output]). 없는 모델은 비용 0으로 기록하고 경고
+MODEL_PRICES_USD_PER_1M={}
 
-# Caption backend: local | openai_batch
-CAPTION_BACKEND=local
+# Caption backend: local (vLLM) | openai (LLM_MODEL_DEFAULT 실시간) | openai_batch (미구현)
+CAPTION_BACKEND=openai
 LOCAL_VLM_BASE_URL=http://localhost:8001/v1
-LOCAL_VLM_MODEL=Qwen/Qwen3-VL-4B-Instruct
-CAPTION_MODEL_VERSION=qwen3vl4b-v1
+LOCAL_VLM_MODEL=cyankiwi/Qwen3-VL-4B-Instruct-AWQ-4bit
+CAPTION_MODEL_VERSION=qwen3vl4b-awq4-v1
 
 # Data sources
 TMDB_READ_TOKEN=
@@ -134,6 +136,8 @@ R2_ACCOUNT_ID=
 R2_ACCESS_KEY_ID=
 R2_SECRET_ACCESS_KEY=
 R2_BUCKET=msf-thumbs
+# 버킷 공개 주소(r2.dev 또는 연결 도메인). backend가 thumb_url을 만든다. 배포 backend에는 이것만 필요
+R2_PUBLIC_URL=
 
 # Search / agent
 CONFIDENCE_THRESHOLD=0.7
@@ -146,6 +150,8 @@ SOFT_FILTER_BOOST=1.1
 
 # Ops
 RATE_LIMIT_PER_DAY=30
+# 브라우저에서 API를 부를 프런트엔드 주소(JSON 배열)
+CORS_ORIGINS=["http://localhost:3000"]
 LANGSMITH_API_KEY=
 LANGSMITH_PROJECT=movie-scene-finder
 ```
@@ -220,15 +226,16 @@ class SceneCaption(BaseModel):
 | 스크립트 | 입력 | 처리 | 출력 |
 | --- | --- | --- | --- |
 | s01_collect_meta | TMDB discover (인기순, KR 포함 300편) | 상세·장르·국가·줄거리 수집, KMDb로 한국어 줄거리 보강 | `movies` 테이블 |
-| s02_collect_images | movies | TMDB images에서 backdrop/still 최대 15장 다운로드 (`--with-trailers` 시 PySceneDetect 키프레임 추가) | `pipeline/data/images/` |
-| s03_dedup | 이미지 | pHash 계산, 같은 영화 내 해밍 거리 ≤ 8 묶음에서 대표 1장 | `scenes` 행(캡션 비어 있음) |
-| s04_caption | scenes | `CAPTION_BACKEND`에 따라 로컬 vLLM 또는 OpenAI Batch로 `SceneCaption` 생성. 두 백엔드 모두 OpenAI 호환 클라이언트 사용 | `scenes.caption_*`, `tags` |
+| s02_collect_images | movies | TMDB images에서 backdrop 최대 15장 다운로드 (TMDB 영화에는 still이 없음. `--with-trailers` 시 PySceneDetect 키프레임 추가) | `pipeline/data/images/` |
+| s03_dedup | 이미지 | pHash 계산, 같은 영화 내 해밍 거리 ≤ 20 묶음에서 대표 1장 (backdrop에 자르기·확대·색 보정 사본이 많아 8로는 거의 걸러지지 않음) | `scenes` 행(캡션 비어 있음) |
+| (build_user_dict) | movies | 제목 + 영화별 주요 배우 10명·감독의 한글 이름으로 Kiwi 사용자 사전 생성. s03 다음에 실행 | `backend/app/search/data/user_dict.txt` (저장소 포함, 배포 backend도 사용) |
+| s04_caption | scenes | `CAPTION_BACKEND`에 따라 로컬 vLLM 또는 OpenAI 실시간 API로 `SceneCaption` 생성(동시 3개, `max_completion_tokens=1200`, TPM 한도 때문). 두 백엔드 모두 OpenAI 호환 클라이언트 사용. 프롬프트는 `search/caption.py`(이미지 질의와 공유) | `scenes.caption_*`, `tags` |
 | s05_validate | scenes | Pydantic 검증 실패 재시도(최대 2회), 실패 목록 출력, 무작위 50개 검수용 CSV 생성 | `reports/caption_review.csv` |
-| s06_build_docs | scenes, movies | 검색 문서 = caption_ko + setting + objects + 장르·연대 (제목 제외) | `search_text` |
+| s06_build_docs | scenes, movies | 검색 문서 = caption_ko + setting + objects + 장르·연대 (제목 제외, 제목 로고가 있을 수 있어 text_in_frame도 제외) | `pipeline/data/search_docs.jsonl` |
 | s07_embed | search_text, plot_ko | dense: OpenAI 임베딩(배치 100) / sparse: §7.2 BM25 가중치 | 벡터 파일(parquet) |
-| s08_upload | 벡터, payload | 새 컬렉션 `scenes_v{n}` 생성 → upsert(256개 배치) → alias `scenes` 교체, 썸네일(512px) R2 업로드 | Qdrant, R2 |
+| s08_upload | 벡터, payload | 새 컬렉션 `scenes_v{n}` 생성 → upsert(256개 배치) → alias `scenes` 교체, 썸네일(긴 변 512px JPEG) R2 `thumbs/{scene_id}.jpg` 업로드 | Qdrant, R2, `scenes.r2_key` |
 
-`make index` = s01~s08 순차 실행. `QDRANT_URL`만 바꾸면 로컬/클라우드 어디든 적재된다.
+`make index` = s01~s08 순차 실행(s03 다음에 build_user_dict). `QDRANT_URL`만 바꾸면 로컬/클라우드 어디든 적재된다.
 
 ---
 
@@ -242,13 +249,14 @@ class Rewritten(BaseModel):
     keywords_ko: list[str]
     soft_filters: dict[Literal["country", "decade", "genre", "is_animation"], str]
 ```
+OpenAI strict 구조화 출력은 자유 키 dict를 받지 않으므로 LLM에서는 고정 필드로 받아 이 형태로 바꾸고, 형식이 틀린 값은 버린다.
 사용자가 확신 없이 말한 조건만 `soft_filters`로 넣는다. 재질문에서 확정된 조건은 State의 `hard_filters`로 관리한다.
 
 ### 7.2 Sparse (BM25) 벡터
 
-- 토큰화: Kiwi, 남길 품사 `NNG, NNP, XR, VV, VA, SL, SN`. 동사·형용사는 어간만. 사용자 사전에 영화 제목·인물명 등록.
+- 토큰화: Kiwi, 남길 품사 `NNG, NNP, XR, VV, VA, SL, SN`(Kiwi가 붙이는 활용 접미사 `VV-R` 등은 `-` 앞으로 비교). 동사·형용사는 어간만, 영어(SL)는 소문자. 사용자 사전에 영화 제목·인물명 등록.
 - term id: `mmh3.hash(token, signed=False)`.
-- 문서 측 값: `tf * (k1 + 1) / (tf + k1 * (1 - b + b * dl / avgdl))`, `k1=1.2`, `b=0.75`, `avgdl`은 s07에서 계산해 `pipeline/data/bm25_stats.json`에 저장하고 backend가 읽는다.
+- 문서 측 값: `tf * (k1 + 1) / (tf + k1 * (1 - b + b * dl / avgdl))`, `k1=1.2`, `b=0.75`, `avgdl`은 s07에서 컬렉션별로 계산해 `pipeline/data/bm25_stats.json`에 저장한다. 질의 측 값은 1.0이라 backend는 이 파일을 읽지 않는다(배포 불필요).
 - 질의 측 값: 등장 토큰마다 1.0. IDF는 Qdrant modifier가 계산한다.
 - 인덱싱과 질의는 반드시 같은 `search/sparse.py` 함수를 사용한다.
 
@@ -266,7 +274,9 @@ s1, s2 = 해당 영화 장면 RRF 점수 1·2위(없으면 0), p_m = 줄거리 �
 
 ### 7.5 검증과 확신도
 
-- `gpt-6-luna`에 사용자 묘사 + 후보 10편의 근거 캡션을 주고 영화별 `{movie_id, score: 0~1, reason, evidence_scene_ids}`를 structured output으로 받는다.
+- `gpt-6-luna`에 사용자 묘사 + 후보 10편의 제목·연도·근거 캡션을 주고 영화별 `{movie_id, score: 0~1, reason}`을 structured output으로 받는다.
+  - `evidence_scene_ids`는 받지 않는다. 근거 장면은 검색 결과에서 가져오고, 이 필드가 출력 토큰의 약 30%를 차지해 응답이 느려졌다. `reason`은 점수 상위 5편만 50자 이내로 쓴다(지연시간은 출력 토큰 수에 비례).
+  - 제목·연도를 주어 LLM의 영화 지식을 쓰되, "제목 글자로 점수를 올리지 말 것", "흔한 장면이면 0.5 이하"를 프롬프트에 넣는다.
 - 검증 점수로 재정렬한다. v1, v2 = 1·2위 점수.
 - `confidence = 0.6 * v1 + 0.4 * min(1, (v1 - v2) / 0.3)`
 
@@ -276,7 +286,7 @@ s1, s2 = 해당 영화 장면 RRF 점수 1·2위(없으면 0), p_m = 줄거리 �
 - 상위 5편에 대해 속성별로 검증 점수 가중 분포의 엔트로피를 계산하고, 이미 물은 속성을 제외한 최댓값 속성을 고른다.
 - 최대 엔트로피가 0이면 재질문하지 않고 바로 답한다.
 - 선택지 = 해당 속성의 고유값(최대 3개) + "모르겠어요". "모르겠어요"는 필터를 추가하지 않는다.
-- 질문 문장만 LLM이 생성하고, 속성 선택은 코드로 한다.
+- 속성 선택은 코드로 하고, 질문 문장은 속성별 고정 문장(`search/clarify.py`의 `QUESTIONS`)이다. 처음에는 LLM이 생성했으나 재질문 요청마다 1.2~2.5초가 더해져 바꿨다.
 
 ---
 
@@ -294,15 +304,19 @@ class SearchState(TypedDict):
     hard_filters: dict[str, str]
     asked_attrs: list[str]
     scene_hits: list[SceneHit]
+    plot_hits: list[PlotHit]
     movie_candidates: list[MovieCandidate]
     verified: list[Verified]
     confidence: float
+    clarify_choice: ClarifyChoice | None  # verify가 고른 재질문 속성(없으면 답한다)
     clarify_turns: int
     pending_question: Question | None
     result: list[ResultItem] | None
-    cost_usd: float
-    timings_ms: dict[str, int]
+    cost_usd: Annotated[float, operator.add]  # 노드는 이번에 쓴 비용만 돌려준다
+    timings_ms: Annotated[dict[str, int], sum_timings]
 ```
+
+상태에 넣는 pydantic 모델은 체크포인트에서 복원되도록 `agent/state.py`의 `STATE_MODELS`에 등록한다.
 
 ### 8.2 노드와 엣지
 
@@ -313,13 +327,16 @@ class SearchState(TypedDict):
 | `retrieve` | §7.3 | Qdrant + 임베딩 |
 | `aggregate` | §7.4 | 코드 |
 | `verify` | §7.5 | gpt-6-luna |
-| `clarify` | §7.6 → `interrupt()` → 답을 `hard_filters`에 추가, `clarify_turns += 1` | 코드 + gpt-6-luna |
-| `answer` | Top 5 + 근거 장면 + 추천 이유 한 줄 | gpt-6-luna (품질 미달 시 `LLM_MODEL_STRONG`) |
+| `ask` | §7.6으로 고른 속성의 질문(고정 문장)과 선택지를 `pending_question`에 넣는다 | 코드 |
+| `clarify` | `interrupt()` → 답을 `hard_filters`에 추가, `clarify_turns += 1` | 코드 |
+| `answer` | Top 5 + 근거 장면(썸네일 URL) + 추천 이유 한 줄(verify의 `reason`을 그대로 씀) | 코드 |
+
+`ask`와 `clarify`를 나눈 이유: LangGraph는 재개할 때 `interrupt()`가 있는 노드를 처음부터 다시 실행하므로, 질문 만들기를 같은 노드에 두면 재개 때 질문이 다시 만들어진다.
 
 ```
 START → analyze_input → rewrite_query → retrieve → aggregate → verify
 verify --(confidence ≥ THRESHOLD or clarify_turns ≥ MAX or 엔트로피 0)--> answer → END
-verify --(그 외)--> clarify → retrieve
+verify --(그 외)--> ask → clarify → retrieve
 ```
 
 체크포인터: `PostgresSaver`, `thread_id = session_id`. 재개: `graph.invoke(Command(resume=<선택값>), config={"configurable": {"thread_id": session_id}})`.
@@ -341,12 +358,14 @@ verify --(그 외)--> clarify → retrieve
 ```
 event: session    data: {"session_id": "..."}
 event: status     data: {"step": "rewrite|retrieve|verify", "message": "..."}
-event: question   data: {"text": "몇 년도쯤 보셨나요?", "options": ["2000s", "2010s", "unknown"], "attr": "decade"}
+event: question   data: {"text": "언제쯤 나온 영화였는지 기억나세요?", "options": ["2000s", "2010s", "unknown"], "labels": ["2000년대", "2010년대", "모르겠어요"], "attr": "decade"}
 event: result     data: {"items": [{"movie_id", "title_ko", "year", "poster_url", "score", "reason", "evidence": [{"scene_id", "thumb_url", "caption_ko"}]}], "confidence": 0.82}
 event: error      data: {"code": "...", "message": "..."}
 ```
 
-보호 장치: IP당 하루 `RATE_LIMIT_PER_DAY`회, 세션당 재질문 `MAX_CLARIFY_TURNS`회, 요청 타임아웃 30초. 세션 종료 시 `sessions`에 비용·지연시간을 기록한다.
+`question`의 `labels`는 화면에 보일 선택지 이름이고, 답할 때는 `options`의 값을 보낸다. `thumb_url`은 `R2_PUBLIC_URL` + `thumbs/{scene_id}.jpg`이며 `R2_PUBLIC_URL`이 없으면 null이다.
+
+보호 장치: IP당 하루 `RATE_LIMIT_PER_DAY`회(`/search`만 센다. 배포 시 프록시의 `X-Forwarded-For`로 IP를 구한다), 세션당 재질문 `MAX_CLARIFY_TURNS`회, 요청 타임아웃 30초. 세션 종료 시 `sessions`에 비용·지연시간(노드 처리 시간 합, 사용자가 답을 고르는 시간 제외)을 기록한다.
 
 ---
 
@@ -430,7 +449,7 @@ ss -ltn | grep -E ':(5432|6333|8000|8001|3000)\s' || echo "ports free"
 ### Phase 1 — 데이터 수집 (1주차)
 
 - [ ] s01, s02, s03 구현
-- [ ] 영화 제목·인물명으로 Kiwi 사용자 사전 생성 (`pipeline/data/user_dict.txt`)
+- [ ] 영화 제목·인물명으로 Kiwi 사용자 사전 생성 (`backend/app/search/data/user_dict.txt`, 배포 backend도 같은 사전을 써야 해서 저장소에 포함)
 - [ ] 골든셋 초안: human 질의 수집 양식 작성, 우선 20개 확보
 
 **완료 기준**: `movies` 300행, 이미지 4,000장 이상, 중복 제거 후 `scenes` 약 3,500행.
@@ -465,11 +484,12 @@ ss -ltn | grep -E ':(5432|6333|8000|8001|3000)\s' || echo "ports free"
 
 - [ ] 프론트엔드(§10) 검색·재질문·결과 화면, 이미지 업로드
 - [ ] 배포
-  1. Railway: Postgres 생성 → `DATABASE_URL` 설정 → `alembic upgrade head`
+  1. Railway: Postgres 생성 → `DATABASE_URL` 설정 → `alembic upgrade head` → `scripts/copy_catalog.sh`로 로컬의 movies·scenes 복사
   2. Qdrant Cloud: 클러스터 생성 → 로컬에서 `QDRANT_URL`/`QDRANT_API_KEY`를 클라우드로 바꿔 `s08_upload` 실행
   3. Railway: backend 서비스(Dockerfile), 환경 변수 등록, `/health` 헬스체크
-  4. Vercel: frontend 배포, `NEXT_PUBLIC_API_URL` 설정, backend CORS에 Vercel 도메인 추가
-  5. OpenAI 월 예산 한도, rate limit 동작 확인
+  4. Vercel: frontend 배포, `NEXT_PUBLIC_API_URL` 설정, backend `CORS_ORIGINS`에 Vercel 도메인 추가
+  5. R2: 버킷 공개 주소(r2.dev)를 켜고 로컬에서 s08로 썸네일 업로드, backend에 `R2_PUBLIC_URL` 설정
+  6. OpenAI 월 예산 한도, rate limit 동작 확인
 
 **완료 기준**: 공개 URL에서 시나리오 1(텍스트)·2(이미지) 성공, 로컬 PC를 끈 상태에서도 동작.
 
