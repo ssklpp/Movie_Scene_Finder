@@ -11,7 +11,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   - Phase 2 결과: 캡션 3,852장(gpt-6-luna), 검증 실패 0.18%, 검수 50장 환각 0건, 로컬 Qdrant `scenes`(→ `scenes_v2`) 3,852 포인트 = scenes 행 수, `movies` 299 포인트.
   - Phase 3 결과: `search/filters.py`·`hybrid.py`·`aggregate.py`, synthetic 300개, `eval/run_eval.py`·`report.py`, E1 결과표(아래 구현 메모). hybrid가 dev에서 dense보다 나음을 확인했다.
   - Phase 4 결과: `search/confidence.py`·`clarify.py`, `agent/`(LangGraph, PostgresSaver), API(SSE·재개·피드백·rate limit), 재질문 시뮬레이터, E6 결과표(아래 구현 메모). curl 시나리오 1과 서버 재시작 후 재개를 실제 서버로 확인했다.
-  - Phase 5 진행: 프론트엔드 완료, 배포 준비(Dockerfile·사용자 사전 포함·DB 주소 정규화·카탈로그 복사) 완료, Qdrant Cloud 적재와 Railway Postgres 카탈로그 복사 완료. 남은 것: Railway backend 서비스, Vercel, CORS, R2 썸네일(s08 업로드와 thumb_url), 배포 환경 지연시간 측정. 요청 p95는 로컬 순차 8.5초(SPEC 목표 8초)다.
+  - Phase 5 진행: 프론트엔드, 배포(Qdrant Cloud, Railway Postgres·backend, Vercel, CORS) 완료. 공개 URL에서 시나리오 1(텍스트 → 재질문 2회 → 결과)·2(이미지)를 API와 브라우저로 확인했고, 휴대폰 LTE(로컬 PC와 무관한 경로)로도 접속을 확인했다(2026-10-04). **Phase 5 완료 기준은 통과했다.** R2 썸네일 3,852장 업로드와 `thumb_url`도 완료했다(2026-10-04). 남은 것: 배포 환경 지연시간(SPEC 목표 p95 8초). backend·Postgres·Qdrant Cloud 리전을 Virginia로 통일한 뒤(2026-10-04, 한국에서 순차 11회) 요청 중간값 6.9초, p95(=최대) 9.4초, 재질문 답변 요청 4.6초. 단계별로 rewrite 1.7~2.3초, retrieve 약 0.3초(통일 전 Qdrant 약 0.7초), verify 3~6초라 남은 시간은 OpenAI 호출이다(로컬 순차 p95 8.5초).
+  - 배포 주소: backend https://moviescenefinder-production.up.railway.app (Railway 변수 `PORT=8000`, 도메인 포트 8000, `CORS_ORIGINS=["https://movie-scene-finder-pi.vercel.app"]`), frontend https://movie-scene-finder-pi.vercel.app (Root Directory `frontend`, `NEXT_PUBLIC_API_URL`).
   - 원격 저장소: https://github.com/ssklpp/Movie_Scene_Finder. Phase 완료 기준(§12)을 통과하면 이 항목을 갱신한다.
 - 현재 Phase의 완료 기준을 통과하기 전에는 다음 Phase 코드를 만들지 않는다.
 - 저장소는 WSL 홈(`~/projects/movie-scene-finder`)에 있다. 모든 명령은 WSL2 셸에서 실행한다(`/mnt/c/...`나 Windows 쪽 Python·Node는 쓰지 않는다).
@@ -98,7 +99,7 @@ Python은 항상 `uv run`으로 실행한다(Python 3.12로 고정하고 시스�
 - 프런트엔드(`frontend/app/`, Next.js 16): `components/SceneSearch.tsx`가 상태(검색 → 진행 단계 → 재질문 → 결과)를 관리하고, `lib/api.ts`가 POST SSE를 `fetch` 스트림으로 읽는다(`EventSource`는 GET만 지원). API 주소는 `NEXT_PUBLIC_API_URL`(`frontend/.env.example`), backend는 `CORS_ORIGINS`로 허용한다.
   - 디자인: 밝은 차가운 회색 바탕에 2.39:1 "영화 화면" 하나, 입력은 그 화면 아래의 자막(노란 글자 + 검은 테두리). 포인트 색은 자막 노랑 `#F3E36B` 하나이고 자막과 캡션 강조에만 쓴다. 글꼴은 제목 Song Myung, 본문 IBM Plex Sans KR. 토큰은 `globals.css`의 `@theme`.
   - 화면 확인: WSL에는 Chromium 실행 라이브러리가 없어(sudo 필요) Windows의 Node + `playwright-core` + Edge(`channel: "msedge"`)로 `localhost:3000`을 캡처했다(스크립트는 저장소 밖). 포스터는 지연 로딩이라 스크롤해야 찍힌다.
-  - 근거 장면 썸네일(`thumb_url`)은 R2를 붙이기 전까지 null이라 캡션만 보인다.
+  - 근거 장면 썸네일: s08이 긴 변 512px JPEG을 R2 `thumbs/{scene_id}.jpg`에 올리고(동시 8개, 3,852장 약 7분), backend는 `R2_PUBLIC_URL`(r2.dev 공개 주소) + 같은 키로 `thumb_url`을 만든다(`search/thumbs.py`, DB의 r2_key는 읽지 않는다). `R2_PUBLIC_URL`이 없으면 null이라 캡션만 보인다. 배포 backend에는 `R2_PUBLIC_URL`만 있으면 되고 R2 키는 업로드하는 로컬에만 둔다.
 - 배포 준비(Phase 5):
   - **Kiwi 사용자 사전은 `backend/app/search/data/user_dict.txt`(저장소에 포함)**다. 배포된 backend도 질의 토큰화에 같은 사전을 써야 하고 `pipeline/data/`는 배포되지 않기 때문이다. `pipeline.build_user_dict`가 이 파일에 쓴다. 사전을 바꾸면 s07·s08을 다시 돌린다.
   - `bm25_stats.json`(avgdl)은 문서 쪽 가중치에만 쓰인다. 질의 값이 1.0이라 backend는 읽지 않으므로 배포에 필요 없다(SPEC의 "backend가 읽는다"는 실제로 쓰이지 않는다).
