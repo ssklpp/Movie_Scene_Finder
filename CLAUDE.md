@@ -6,7 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 현재 상태
 
-- **현재 Phase: 2 (캡셔닝과 적재)**. Phase 0·1 완료(2026-10-04). Phase 1 결과: movies 300편, 이미지 4,446장, scenes 3,852행, Kiwi 사용자 사전, human 질의 20개. KMDb 줄거리 보강은 API 키 발급 대기 중(완료 기준 밖). 원격 저장소: https://github.com/ssklpp/Movie_Scene_Finder. Phase 완료 기준(§12)을 통과하면 이 줄을 갱신한다.
+- **현재 Phase: 3 (검색과 첫 평가)**. Phase 0·1·2 완료(2026-10-04).
+  - Phase 1 결과: movies 300편, 이미지 4,446장, scenes 3,852행, Kiwi 사용자 사전, human 질의 20개. KMDb 줄거리 보강은 API 키 발급 대기 중(완료 기준 밖).
+  - Phase 2 결과: 캡션 3,852장(gpt-6-luna), 검증 실패 0.18%, 검수 50장 환각 0건, 로컬 Qdrant `scenes`(→ `scenes_v2`) 3,852 포인트 = scenes 행 수, `movies` 299 포인트.
+  - `search/sparse.py`와 `search/qdrant.py`는 s07·s08 때문에 이미 있다. Phase 3에서 남은 것은 `search/hybrid.py`·`aggregate.py`(§7.3~7.4), 합성 질의 300개, `run_eval.py`, E1이다. 원격 저장소: https://github.com/ssklpp/Movie_Scene_Finder. Phase 완료 기준(§12)을 통과하면 이 줄을 갱신한다.
 - 현재 Phase의 완료 기준을 통과하기 전에는 다음 Phase 코드를 만들지 않는다.
 - 저장소는 WSL 홈(`~/projects/movie-scene-finder`)에 있다. 모든 명령은 WSL2 셸에서 실행한다(`/mnt/c/...`나 Windows 쪽 Python·Node는 쓰지 않는다).
 - Python 프로젝트는 backend·pipeline·eval이 함께 쓰는 uv workspace 하나로 만든다(`requires-python = ">=3.12,<3.13"`, §12 Phase 0). §3 트리에 보이는 `backend/pyproject.toml`은 workspace 멤버다.
@@ -68,6 +71,8 @@ Python은 항상 `uv run`으로 실행한다(Python 3.12로 고정하고 시스�
 - s06은 검색 문서를 DB가 아닌 `pipeline/data/search_docs.jsonl`에 쓴다(SPEC 스키마에 search_text 컬럼이 없다). 화면 속 글자(text_in_frame)는 제목 로고가 있을 수 있어 넣지 않는다.
 - `search/sparse.py`(SPEC §7.3 이전에 s07이 필요해 Phase 2에서 만들었다): Kiwi는 활용 종류를 품사 접미사로 붙이므로(`VV-R`, `VA-I`) 품사는 `-` 앞부분으로 비교한다. 영어(SL)는 소문자로 맞춘다. `bm25_stats.json`에는 컬렉션별 avgdl을 둔다(`scenes` 약 33.2, `movies` 약 54.6 토큰).
 - s07 출력은 `pipeline/data/vectors/{scenes,movies}.parquet`. dense는 "모델|차원|문서" 해시로 캐시해 바뀐 문서만 다시 임베딩한다. 전체 임베딩 비용 약 $0.012. 줄거리가 없는 영화 1편은 `movies`에서 빠진다(p_m = 0).
+- s08: 컬렉션·벡터 이름(`scenes_v{n}`, `movies`, `dense`, `sparse_ko`, `plot_dense`, `plot_sparse_ko`)과 연대 키(`"2010s"`)는 `search/qdrant.py`에 있고 검색도 이것을 쓴다. 포인트 ID는 scene_id의 UUID5이며 scene_id는 payload에 있다. 입력 parquet가 같으면 건너뛰므로 다시 적재하려면 `--force`. 시험용으로 만든 `scenes_v1`(41개)은 다음 적재 때 정리된다.
+- `make index`는 s03 다음에 `build_user_dict`를 돌린다(s07 sparse 토큰화가 사전을 쓴다).
 - 로컬 VLM은 E2 재실험용으로 남겨 둔다. `scripts/run_vlm.sh`로 띄운다(vLLM은 프로젝트 venv가 아닌 `~/.venvs/vllm`, vllm 0.30.0). 시작에 약 100초 걸린다.
   - 모델은 SPEC의 원본 `Qwen/Qwen3-VL-4B-Instruct`가 아니라 **AWQ 4비트 양자화본 `cyankiwi/Qwen3-VL-4B-Instruct-AWQ-4bit`**다. 원본(8.9GB)은 VRAM에 안 들어가고, 공식 FP8(5.7GiB)은 최대 길이 3,072로 줄여야 했으며 시작 중 WSL이 재시작됐다. AWQ 4비트는 SPEC 설정(4,096, 0.85) 그대로 뜨고 KV 캐시 1.89GiB가 남는다. 캡션 1장 약 1~2초, 입력 약 930토큰.
   - Windows 화면 표시가 VRAM을 쓴다. 브라우저·Discord·Steam 등을 끄면 약 0.5GB가 늘어난다.
