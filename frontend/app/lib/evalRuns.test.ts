@@ -88,8 +88,15 @@ describe("headline", () => {
       run(1, "E3", "caption_both_agent", { agent: true, recall_at_1: 0.86 }),
       run(5, "E3", "caption_both_agent", { agent: true, recall_at_1: 0.88 }),
       run(6, "IMG", "agent_turns2_skip_rewrite", { split: "test", recall_at_1: 0.9 }),
+      run(7, "FINAL", "agent", { split: "test", dataset_version: "image_v1" }),
+      run(8, "FINAL", "agent", { split: "test", dataset_version: "human_v1" }),
+      run(9, "FINAL", "agent", { split: "test", dataset_version: "synthetic_v1" }),
     ];
     expect(headline(runs, "dev").map((h) => [h.label, h.run.id])).toEqual([["기억 묘사", 5]]);
-    expect(headline(runs, "test").map((h) => [h.label, h.run.id])).toEqual([["사진", 6]]);
+    // test는 최종 측정(FINAL)의 사람이 쓴 묘사와 사진만, 데이터셋으로 구분한다
+    expect(headline(runs, "test").map((h) => [h.label, h.run.id])).toEqual([
+      ["사람이 쓴 묘사", 8],
+      ["사진", 7],
+    ]);
   });
 });

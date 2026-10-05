@@ -77,6 +77,11 @@ export const EXPERIMENTS: Record<string, Experiment> = {
       "사진만 있는 질의는 재작성 없이 캡션으로 바로 검색한다. 정확도는 같고 요청이 약 2.5초 빨라졌다. 캡션 추론은 끄면 정확도가 조금 낮아 유지한다.",
     chosen: ["search_hybrid", "agent_turns2_skip_rewrite"],
   },
+  FINAL: {
+    title: "최종 측정",
+    decision: "설정을 모두 정한 뒤 test 세트로 한 번만 잰 결과다. 검색만(search)은 같은 질의의 기준선이다.",
+    chosen: ["agent"],
+  },
 };
 
 /** 화면에 보일 데이터셋 이름 */
@@ -86,17 +91,32 @@ export const DATASETS: Record<string, string> = {
   image_v1: "사진",
 };
 
-/** 맨 위 자막에 쓰는 운영 설정 실행: 텍스트(에이전트)와 사진(에이전트) */
-const HEADLINE = [
-  { experiment: "E3", name: "caption_both_agent", label: "기억 묘사" },
-  { experiment: "IMG", name: "agent_turns2_skip_rewrite", label: "사진" },
-];
+type HeadlineRun = { experiment: string; name: string; dataset?: string; label: string };
+
+/**
+ * 맨 위 자막에 쓰는 운영 설정 실행. dev는 설정을 고른 실험의 운영 설정(텍스트·사진 에이전트),
+ * test는 최종 측정(FINAL)의 사람이 쓴 묘사(MVP 목표의 기준)와 사진이다.
+ */
+const HEADLINE: Record<string, HeadlineRun[]> = {
+  dev: [
+    { experiment: "E3", name: "caption_both_agent", label: "기억 묘사" },
+    { experiment: "IMG", name: "agent_turns2_skip_rewrite", label: "사진" },
+  ],
+  test: [
+    { experiment: "FINAL", name: "agent", dataset: "human_v1", label: "사람이 쓴 묘사" },
+    { experiment: "FINAL", name: "agent", dataset: "image_v1", label: "사진" },
+  ],
+};
 
 /** split의 운영 설정 결과(설정마다 최신 실행). 없는 것은 빠진다. */
 export function headline(runs: EvalRun[], split: string): { label: string; run: EvalRun }[] {
-  return HEADLINE.flatMap(({ experiment, name, label }) => {
+  return (HEADLINE[split] ?? []).flatMap(({ experiment, name, dataset, label }) => {
     const matches = runs.filter(
-      (r) => r.split === split && r.experiment === experiment && r.name === name,
+      (r) =>
+        r.split === split &&
+        r.experiment === experiment &&
+        r.name === name &&
+        (dataset === undefined || r.dataset_version === dataset),
     );
     if (!matches.length) return [];
     return [{ label, run: matches.reduce((a, b) => (b.id > a.id ? b : a)) }];
