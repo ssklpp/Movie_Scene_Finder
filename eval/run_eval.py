@@ -3,8 +3,12 @@
     uv run python -m eval.run_eval --config eval/configs/E1_hybrid.yaml --split dev --no-agent
     uv run python -m eval.run_eval --config eval/configs/E6_turns2.yaml --split dev
 
-- 데이터셋: eval/datasets/{synthetic,human}_v1.jsonl 중 split이 맞는 레코드
-  (dev = synthetic dev 200, test = synthetic test 100 + human).
+- 데이터셋: eval/datasets/{synthetic,human,image}_v1.jsonl 중 split이 맞는 레코드
+  (기본 --datasets synthetic,human: dev = synthetic dev 200, test = synthetic test 100 + human).
+  이미지 세트(eval/make_image_set.py)는 --datasets image로 따로 돌린다. 이미지 파일이 없는
+  레코드는 건너뛴다.
+- 이미지 질의: 에이전트 모드는 업로드 폴더에 복사해 서비스와 같은 경로(analyze_input)로 돌린다.
+  --no-agent는 같은 프롬프트로 캡션을 만들고 색인과 같은 형식의 검색 문서(s06)로 검색한다.
 - --no-agent: 질의를 그대로 retrieve → aggregate 한다(재작성·검증·재질문 없음).
 - 에이전트 모드(--no-agent 없이, 설정 agent: true): 에이전트 그래프 전체를 메모리 체크포인터로
   돌리고, 재질문에는 시뮬레이터(eval/simulator.py)가 정답 영화의 속성으로 답한다. sessions에는
@@ -40,23 +44,31 @@ from sqlalchemy import select
 
 from app.agent.checkpoint import make_serde
 from app.agent.graph import build_graph, initial_state
+from app.core import llm
 from app.core.config import REPO_ROOT, ReasoningEffort, get_settings
 from app.core.logging import setup_logging
 from app.core.tracing import setup_tracing
+from app.core.uploads import MIME_BY_SUFFIX, UPLOAD_DIR, save_upload
 from app.db.models import EvalRun, Movie
 from app.db.session import SessionLocal
 from app.search.aggregate import aggregate
+from app.search.caption import OPENAI_CAPTION_KWARGS, SceneCaption, build_messages
 from app.search.filters import MovieAttrs
 from app.search.hybrid import Mode, retrieve
 from app.search.qdrant import decade_key
 from eval.simulator import simulated_answer
 from eval.variants import IndexVariant, activate
+from pipeline.s06_build_docs import build_search_text
 
 logger = logging.getLogger(__name__)
 
 DATASETS_DIR = REPO_ROOT / "eval" / "datasets"
 REPORTS_DIR = REPO_ROOT / "reports"
-DATASET_FILES = {"synthetic": "synthetic_v1.jsonl", "human": "human_v1.jsonl"}
+DATASET_FILES = {
+    "synthetic": "synthetic_v1.jsonl",
+    "human": "human_v1.jsonl",
+    "image": "image_v1.jsonl",
+}
 MAX_AGENT_REQUESTS = 6  # 재질문이 끝나지 않는 경우를 막는 안전장치
 
 
@@ -82,8 +94,16 @@ class EvalConfig(BaseModel):
 class Example:
     id: str
     dataset: str
-    query: str
+    query: str | None
     answer_tmdb_id: int
+    image_path: str | None = None  # 저장소 기준 상대 경로
+
+    @property
+    def label(self) -> str:
+        """보고서에 보일 질의."""
+        if self.image_path:
+            return f"[이미지 {Path(self.image_path).name}] {self.query or ''}".strip()
+        return self.query or ""
 
 
 @dataclass(frozen=True)
@@ -113,7 +133,10 @@ def load_config(path: Path) -> EvalConfig:
 
 
 def load_examples(
-    split: str, datasets: Iterable[str], datasets_dir: Path = DATASETS_DIR
+    split: str,
+    datasets: Iterable[str],
+    datasets_dir: Path = DATASETS_DIR,
+    repo_root: Path = REPO_ROOT,
 ) -> list[Example]:
     examples = []
     for name in datasets:
@@ -122,9 +145,30 @@ def load_examples(
             continue
         for line in path.read_text(encoding="utf-8").splitlines():
             r = json.loads(line)
-            if r["split"] == split:
-                examples.append(Example(r["id"], name, r["query"], int(r["answer_tmdb_id"])))
+            if r["split"] != split:
+                continue
+            image = r.get("image_path")
+            if image and not (repo_root / image).exists():
+                logger.warning("skip %s: image not found (%s)", r["id"], image)
+                continue
+            examples.append(Example(r["id"], name, r.get("query"), int(r["answer_tmdb_id"]), image))
     return examples
+
+
+def caption_query(image_path: Path) -> tuple[str, float]:
+    """이미지 → (검색 문장, 비용). analyze_input과 같은 프롬프트, s06과 같은 문서 형식."""
+    data = image_path.read_bytes()
+    caption, stats = llm.parse(
+        build_messages(data, MIME_BY_SUFFIX[image_path.suffix.lower()]),
+        SceneCaption,
+        model=get_settings().llm_model_default,
+        **OPENAI_CAPTION_KWARGS,
+    )
+    if caption is None:
+        return "", stats.cost_usd
+    tags = {"setting": caption.setting, "objects": caption.objects}
+    text = build_search_text(caption.caption_ko, tags, None, None, caption.caption_en)
+    return text, stats.cost_usd
 
 
 def rank_of(answer: int, ranked: Sequence[int]) -> int | None:
@@ -153,7 +197,11 @@ def percentile(values: Sequence[float], p: float) -> float:
 
 def run_query(ex: Example, cfg: EvalConfig, tmdb_by_movie: dict[int, int]) -> QueryResult:
     started = time.perf_counter()
-    result = retrieve(ex.query, mode=cfg.mode)
+    query, caption_cost = ex.query or "", 0.0
+    if ex.image_path:
+        text, caption_cost = caption_query(REPO_ROOT / ex.image_path)
+        query = f"{query}\n{text}".strip()
+    result = retrieve(query, mode=cfg.mode)
     ranked = aggregate(
         result.scene_hits,
         result.plot_hits,
@@ -164,15 +212,16 @@ def run_query(ex: Example, cfg: EvalConfig, tmdb_by_movie: dict[int, int]) -> Qu
     )
     latency_ms = round((time.perf_counter() - started) * 1000)
     top = [tmdb_by_movie[m.movie_id] for m in ranked]
+    embed_cost = result.embed_stats.cost_usd if result.embed_stats else 0.0
     return QueryResult(
         id=ex.id,
         dataset=ex.dataset,
-        query=ex.query,
+        query=ex.label,
         answer_tmdb_id=ex.answer_tmdb_id,
         rank=rank_of(ex.answer_tmdb_id, top),
         top_tmdb_ids=top,
         latency_ms=latency_ms,
-        cost_usd=result.embed_stats.cost_usd if result.embed_stats else 0.0,
+        cost_usd=caption_cost + embed_cost,
     )
 
 
@@ -191,21 +240,29 @@ def run_agent_query(ex: Example, answer: MovieAttrs, tmdb_by_movie: dict[int, in
     graph = build_graph(InMemorySaver(serde=make_serde()))
     session_id = str(uuid.uuid4())
     config: RunnableConfig = {"configurable": {"thread_id": session_id}}
-    graph_input: Any = initial_state(session_id, ex.query, None)
+    image_key = None
+    if ex.image_path:
+        path = REPO_ROOT / ex.image_path
+        image_key = save_upload(path.read_bytes(), path.suffix.lower())
+    graph_input: Any = initial_state(session_id, ex.query, image_key)
     latencies: list[int] = []
     out: dict[str, Any] = {}
-    for _ in range(MAX_AGENT_REQUESTS):
-        started = time.perf_counter()
-        out = graph.invoke(graph_input, config)
-        latencies.append(round((time.perf_counter() - started) * 1000))
-        if "__interrupt__" not in out:
-            break
-        graph_input = Command(resume=simulated_answer(out["__interrupt__"][0].value, answer))
+    try:
+        for _ in range(MAX_AGENT_REQUESTS):
+            started = time.perf_counter()
+            out = graph.invoke(graph_input, config)
+            latencies.append(round((time.perf_counter() - started) * 1000))
+            if "__interrupt__" not in out:
+                break
+            graph_input = Command(resume=simulated_answer(out["__interrupt__"][0].value, answer))
+    finally:
+        if image_key:
+            (UPLOAD_DIR / image_key).unlink(missing_ok=True)
     top = [tmdb_by_movie[r.movie_id] for r in out.get("result") or []]
     return QueryResult(
         id=ex.id,
         dataset=ex.dataset,
-        query=ex.query,
+        query=ex.label,
         answer_tmdb_id=ex.answer_tmdb_id,
         rank=rank_of(ex.answer_tmdb_id, top),
         top_tmdb_ids=top,
@@ -321,7 +378,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--split", choices=["dev", "test"], default="dev")
-    parser.add_argument("--datasets", default="synthetic,human", help="쉼표로 구분")
+    parser.add_argument(
+        "--datasets", default="synthetic,human", help="쉼표로 구분 (synthetic, human, image)"
+    )
     parser.add_argument("--no-agent", action="store_true", help="에이전트 없이 검색만 평가")
     parser.add_argument("--limit", type=int, help="앞 N개 질의만(시험용, eval_runs에 기록 안 함)")
     parser.add_argument("--workers", type=int, help="동시 질의 수(기본: 에이전트 4, 검색만 1)")

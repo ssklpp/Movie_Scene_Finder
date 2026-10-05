@@ -22,3 +22,6 @@ frontend/out/
 
 # 질의 이미지 업로드 (Phase 5에서 R2로 바꾼다)
 backend/data/
+
+# 이미지 평가 세트(TMDB 원본에서 만든 이미지, 모니터 촬영 사진). eval/datasets/image_v1.jsonl만 커밋한다
+eval/data/
