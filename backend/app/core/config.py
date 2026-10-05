@@ -60,6 +60,8 @@ class Settings(BaseSettings):
     # 에이전트 LLM 호출의 추론 강도. 둘 다 none(E6 비교: 품질 차이 없고 지연시간 꼬리가 사라짐).
     rewrite_reasoning_effort: ReasoningEffort = "none"
     verify_reasoning_effort: ReasoningEffort = "none"
+    # 이미지 질의 캡션(analyze_input)의 추론 강도. 프롬프트는 색인(s04, low)과 같고 강도만 바꾼다.
+    image_caption_reasoning_effort: ReasoningEffort = "low"
 
     # Ops
     rate_limit_per_day: int = 30

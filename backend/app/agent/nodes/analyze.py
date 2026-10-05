@@ -14,12 +14,13 @@ def analyze_input(state: SearchState) -> SearchState:
     if not key:
         return {"image_caption": None, "cost_usd": 0.0}
     data, mime = load_upload(key)
+    s = get_settings()
     try:
         caption, stats = llm.parse(
             build_messages(data, mime),
             SceneCaption,
-            model=get_settings().llm_model_default,
-            **OPENAI_CAPTION_KWARGS,
+            model=s.llm_model_default,
+            **{**OPENAI_CAPTION_KWARGS, "reasoning_effort": s.image_caption_reasoning_effort},
         )
     except Exception as e:
         logger.warning("image caption failed for %s: %s", key, e)

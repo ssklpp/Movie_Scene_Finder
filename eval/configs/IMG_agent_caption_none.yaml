@@ -1,0 +1,6 @@
+# 이미지 질의 지연 개선: 질의 캡션 추론 none(기본 low, IMG_agent와 비교). --datasets image
+experiment: IMG
+name: agent_turns2_caption_none
+agent: true
+max_clarify_turns: 2
+image_caption_reasoning_effort: none

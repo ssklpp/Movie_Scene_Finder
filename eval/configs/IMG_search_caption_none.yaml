@@ -1,0 +1,6 @@
+# 이미지 질의 지연 개선: 질의 캡션 추론 none(기본 low, IMG_search와 비교). --datasets image
+experiment: IMG
+name: search_hybrid_caption_none
+mode: hybrid
+agent: false
+image_caption_reasoning_effort: none

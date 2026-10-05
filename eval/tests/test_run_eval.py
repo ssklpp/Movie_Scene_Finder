@@ -118,3 +118,10 @@ def test_load_examples_image_skips_missing_file(tmp_path: Path) -> None:
     examples = load_examples("dev", ["image"], tmp_path, repo_root=tmp_path)
     assert [(e.id, e.image_path) for e in examples] == [("img-1", "imgs/a.jpg")]
     assert examples[0].label == "[이미지 a.jpg]"
+
+
+def test_img_caption_none_configs_load() -> None:
+    for name in ("IMG_search_caption_none", "IMG_agent_caption_none"):
+        cfg = load_config(CONFIGS / f"{name}.yaml")
+        assert cfg.experiment == "IMG" and cfg.image_caption_reasoning_effort == "none"
+    assert load_config(CONFIGS / "IMG_agent.yaml").image_caption_reasoning_effort is None

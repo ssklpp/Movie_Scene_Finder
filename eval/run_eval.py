@@ -86,6 +86,7 @@ class EvalConfig(BaseModel):
     confidence_threshold: float | None = None  # 에이전트 모드만
     rewrite_reasoning_effort: ReasoningEffort | None = None  # 에이전트 모드만
     verify_reasoning_effort: ReasoningEffort | None = None  # 에이전트 모드만
+    image_caption_reasoning_effort: ReasoningEffort | None = None  # 이미지 질의만
     # 실험용 색인 변형(E3·E4·E7). 있으면 로컬 Qdrant의 exp_* 컬렉션으로 검색한다(eval/variants.py).
     index: IndexVariant | None = None
 
@@ -158,11 +159,12 @@ def load_examples(
 def caption_query(image_path: Path) -> tuple[str, float]:
     """이미지 → (검색 문장, 비용). analyze_input과 같은 프롬프트, s06과 같은 문서 형식."""
     data = image_path.read_bytes()
+    s = get_settings()
     caption, stats = llm.parse(
         build_messages(data, MIME_BY_SUFFIX[image_path.suffix.lower()]),
         SceneCaption,
-        model=get_settings().llm_model_default,
-        **OPENAI_CAPTION_KWARGS,
+        model=s.llm_model_default,
+        **{**OPENAI_CAPTION_KWARGS, "reasoning_effort": s.image_caption_reasoning_effort},
     )
     if caption is None:
         return "", stats.cost_usd
@@ -301,6 +303,8 @@ def apply_overrides(cfg: EvalConfig) -> None:
         settings.rewrite_reasoning_effort = cfg.rewrite_reasoning_effort
     if cfg.verify_reasoning_effort is not None:
         settings.verify_reasoning_effort = cfg.verify_reasoning_effort
+    if cfg.image_caption_reasoning_effort is not None:
+        settings.image_caption_reasoning_effort = cfg.image_caption_reasoning_effort
 
 
 def git_commit() -> str:
