@@ -1,0 +1,5 @@
+# test 최종 측정의 기준선: 같은 test 질의를 에이전트 없이 검색만(hybrid). --no-agent로 돌린다.
+experiment: FINAL
+name: search
+mode: hybrid
+agent: false

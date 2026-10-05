@@ -1,0 +1,6 @@
+# test 최종 측정(SPEC §12 Phase 6, 1회만): 운영 설정 그대로 에이전트 + 재질문 시뮬레이터.
+# 데이터셋마다 따로 돌린다(--datasets synthetic | human | image), 순차(--workers 1).
+experiment: FINAL
+name: agent
+agent: true
+max_clarify_turns: 2
