@@ -1,0 +1,5 @@
+# 이미지 질의(SPEC §11 image). --datasets image로 돌린다. 에이전트 + 재질문 시뮬레이터(운영 설정).
+experiment: IMG
+name: agent_turns2
+agent: true
+max_clarify_turns: 2

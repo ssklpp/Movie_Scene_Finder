@@ -1,0 +1,5 @@
+# 이미지 질의(SPEC §11 image). --datasets image로 돌린다. 검색만: 캡션 → s06 형식 문서로 hybrid 검색.
+experiment: IMG
+name: search_hybrid
+mode: hybrid
+agent: false
