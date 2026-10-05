@@ -16,6 +16,7 @@ from app.agent.nodes.clarify import answer_value
 from app.agent.nodes.rewrite import valid_soft_filters
 from app.agent.prompts import RewriteOutput, SoftFilterFields
 from app.agent.state import Question
+from app.core.config import get_settings
 from app.core.llm import CallStats
 from app.core.uploads import load_upload, save_upload
 from app.search.caption import People, SceneCaption
@@ -58,9 +59,11 @@ class Fakes:
         self.retrieve_calls: list[tuple[str, dict[str, str]]] = []
         self.chat_calls = 0
         self.caption_fails = False
+        self.rewrite_calls = 0
 
     def parse(self, messages: Any, fmt: type, **kw: Any) -> tuple[Any, CallStats]:
         if fmt is RewriteOutput:
+            self.rewrite_calls += 1
             out = RewriteOutput(
                 scene_ko="반지하 집에 물이 찬다",
                 keywords_ko=["반지하", "홍수"],
@@ -227,6 +230,36 @@ def test_caption_failure_falls_back_to_text(
     fakes.caption_fails = True
     out = graph.invoke(initial_state("s1", "반지하에 물 차는 장면", key), CFG)
     assert out["image_caption"] is None and out["result"][0].movie_id == 1
+
+
+@pytest.mark.parametrize("skip", [False, True])
+def test_image_only_query_can_skip_rewrite(
+    run: Callable[..., tuple[Any, Fakes]],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    skip: bool,
+) -> None:
+    key = save_upload(b"\xff\xd8jpeg", ".jpg", tmp_path)
+    monkeypatch.setattr("app.agent.nodes.analyze.load_upload", lambda k: load_upload(k, tmp_path))
+    monkeypatch.setattr(get_settings(), "image_skip_rewrite", skip)
+    graph, fakes = run(lambda n: {1: 0.95})
+    out = graph.invoke(initial_state("s1", None, key), CFG)
+    assert fakes.rewrite_calls == (0 if skip else 1)
+    assert out["result"][0].movie_id == 1
+    if skip:  # 캡션(한·영) + 장소·물건으로 검색한다
+        text, _ = fakes.retrieve_calls[0]
+        assert text.startswith("비 오는 밤 반지하") and text.endswith("반지하 창문")
+
+
+def test_text_with_image_still_rewrites(
+    run: Callable[..., tuple[Any, Fakes]], monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    key = save_upload(b"\xff\xd8jpeg", ".jpg", tmp_path)
+    monkeypatch.setattr("app.agent.nodes.analyze.load_upload", lambda k: load_upload(k, tmp_path))
+    monkeypatch.setattr(get_settings(), "image_skip_rewrite", True)
+    graph, fakes = run(lambda n: {1: 0.95})
+    graph.invoke(initial_state("s1", "반지하에 물 차는 장면", key), CFG)
+    assert fakes.rewrite_calls == 1
 
 
 def test_answer_value_unknown_for_invalid_option() -> None:

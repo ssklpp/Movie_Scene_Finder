@@ -9,6 +9,7 @@ from app.agent.prompts import RewriteOutput, SoftFilterFields, rewrite_messages
 from app.agent.state import Rewritten, SearchState
 from app.core import llm
 from app.core.config import get_settings
+from app.search.caption import SceneCaption
 
 DECADE = re.compile(r"^\d{3}0s$")
 
@@ -33,10 +34,20 @@ def fallback(state: SearchState) -> Rewritten:
     return Rewritten(scene_ko=text, keywords_ko=[], soft_filters={})
 
 
+def from_caption(caption: SceneCaption) -> Rewritten:
+    """사진만 있는 질의: 캡션은 색인과 같은 프롬프트로 만들었으니 그대로 검색어로 쓴다."""
+    scene = " ".join(t for t in (caption.caption_ko, caption.caption_en) if t)
+    keywords = [t for t in (caption.setting, *caption.objects) if t]
+    return Rewritten(scene_ko=scene, keywords_ko=keywords, soft_filters={})
+
+
 @timed("rewrite_query")
 def rewrite_query(state: SearchState) -> SearchState:
-    genres = known_genres()
     s = get_settings()
+    caption = state.get("image_caption")
+    if s.image_skip_rewrite and caption is not None and not (state.get("query_text") or "").strip():
+        return {"rewritten": from_caption(caption), "cost_usd": 0.0}
+    genres = known_genres()
     try:
         out, stats = llm.parse(
             rewrite_messages(state.get("query_text"), state.get("image_caption"), genres),

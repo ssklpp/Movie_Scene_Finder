@@ -1,0 +1,6 @@
+# 이미지 질의 지연 개선: 사진만 있는 질의는 재작성(LLM) 없이 캡션으로 바로 검색(IMG_agent와 비교). --datasets image
+experiment: IMG
+name: agent_turns2_skip_rewrite
+agent: true
+max_clarify_turns: 2
+image_skip_rewrite: true

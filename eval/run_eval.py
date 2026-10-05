@@ -87,6 +87,7 @@ class EvalConfig(BaseModel):
     rewrite_reasoning_effort: ReasoningEffort | None = None  # 에이전트 모드만
     verify_reasoning_effort: ReasoningEffort | None = None  # 에이전트 모드만
     image_caption_reasoning_effort: ReasoningEffort | None = None  # 이미지 질의만
+    image_skip_rewrite: bool | None = None  # 이미지 질의 + 에이전트 모드만
     # 실험용 색인 변형(E3·E4·E7). 있으면 로컬 Qdrant의 exp_* 컬렉션으로 검색한다(eval/variants.py).
     index: IndexVariant | None = None
 
@@ -313,6 +314,8 @@ def apply_overrides(cfg: EvalConfig) -> None:
         settings.verify_reasoning_effort = cfg.verify_reasoning_effort
     if cfg.image_caption_reasoning_effort is not None:
         settings.image_caption_reasoning_effort = cfg.image_caption_reasoning_effort
+    if cfg.image_skip_rewrite is not None:
+        settings.image_skip_rewrite = cfg.image_skip_rewrite
 
 
 def git_commit() -> str:
