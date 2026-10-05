@@ -110,7 +110,7 @@ function Groups({ groups, metric }: { groups: Group[]; metric: Metric }) {
   return (
     <div className="mt-8 space-y-12">
       {groups.map((g) => (
-        <ExperimentSection key={`${g.experiment}-${g.agent}`} group={g} metric={metric} max={max} />
+        <ExperimentSection key={groupId(g)} group={g} metric={metric} max={max} />
       ))}
     </div>
   );
@@ -123,13 +123,15 @@ function title(g: Group): string {
 
 function ExperimentSection({ group, metric, max }: { group: Group; metric: Metric; max: number }) {
   return (
-    <section aria-labelledby={`exp-${group.experiment}-${group.agent}`}>
+    <section aria-labelledby={groupId(group)}>
       <h2
-        id={`exp-${group.experiment}-${group.agent}`}
+        id={groupId(group)}
         className="flex flex-wrap items-baseline gap-x-3 font-display text-2xl"
       >
         {title(group)}
-        <span className="font-sans text-sm text-muted">{group.agent ? "에이전트" : "검색만"}</span>
+        <span className="font-sans text-sm text-muted">
+          {group.agent ? "에이전트" : "검색만"} · {group.dataset || "데이터셋 미상"}
+        </span>
       </h2>
 
       <ul className="mt-4 space-y-2" aria-label={`${metric.label} 막대 차트`}>
@@ -220,4 +222,8 @@ function tooltip(r: EvalRun): string {
     return `${m.label} ${v === null ? "-" : m.format(v)}`;
   });
   return `${r.name} · ${parts.join(" · ")} · ${r.dataset_version ?? ""} · run #${r.id} · ${r.commit ?? ""}`;
+}
+
+function groupId(g: Group): string {
+  return `exp-${g.experiment}-${g.dataset}-${g.agent}`.replace(/[^\w-]/g, "_");
 }

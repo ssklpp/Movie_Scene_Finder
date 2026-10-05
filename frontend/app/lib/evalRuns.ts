@@ -47,40 +47,46 @@ export const EXPERIMENTS: Record<string, string> = {
   E5: "줄거리 가중치 W_PLOT",
   E6: "최대 재질문 횟수",
   E7: "임베딩 차원",
+  IMG: "이미지 질의",
 };
 
-/** 같은 실험·split·평가 방식(검색만/에이전트)의 설정별 최신 실행과 실행 횟수. */
+/** 같은 실험·split·데이터셋·평가 방식(검색만/에이전트)의 설정별 최신 실행과 실행 횟수. */
 export type Group = {
   experiment: string;
+  dataset: string;
   agent: boolean;
   rows: { latest: EvalRun; count: number }[];
 };
 
-/** split 하나의 실행을 실험·평가 방식별로 묶고, 설정 이름마다 가장 최근(id가 큰) 실행만 남긴다. */
+/**
+ * split 하나의 실행을 실험·데이터셋·평가 방식별로 묶고, 설정 이름마다 가장 최근(id가 큰) 실행만
+ * 남긴다. 같은 설정을 다른 데이터셋(예: test의 synthetic과 human)으로 돌린 결과가 서로 덮지 않는다.
+ */
 export function groupRuns(runs: EvalRun[], split: string): Group[] {
-  const groups = new Map<string, Map<string, { latest: EvalRun; count: number }>>();
+  const groups = new Map<string, Group>();
   for (const run of runs) {
     if (run.split !== split) continue;
-    const gkey = `${run.experiment}|${run.agent}`;
-    const byName = groups.get(gkey) ?? new Map<string, { latest: EvalRun; count: number }>();
-    groups.set(gkey, byName);
-    const prev = byName.get(run.name);
-    byName.set(run.name, {
-      latest: prev && prev.latest.id > run.id ? prev.latest : run,
-      count: (prev?.count ?? 0) + 1,
-    });
+    const dataset = run.dataset_version ?? "";
+    const gkey = `${run.experiment}|${dataset}|${run.agent}`;
+    const group = groups.get(gkey) ?? { experiment: run.experiment, dataset, agent: run.agent, rows: [] };
+    groups.set(gkey, group);
+    const prev = group.rows.find((r) => r.latest.name === run.name);
+    if (prev) {
+      if (run.id > prev.latest.id) prev.latest = run;
+      prev.count += 1;
+    } else {
+      group.rows.push({ latest: run, count: 1 });
+    }
   }
-  return [...groups.entries()]
-    .map(([gkey, byName]) => {
-      const [experiment, agent] = gkey.split("|");
-      const rows = [...byName.values()].sort((a, b) => a.latest.name.localeCompare(b.latest.name));
-      return { experiment, agent: agent === "true", rows };
-    })
-    .sort((a, b) =>
-      a.experiment === b.experiment
-        ? Number(a.agent) - Number(b.agent)
-        : a.experiment.localeCompare(b.experiment, undefined, { numeric: true }),
-    );
+  for (const g of groups.values()) {
+    g.rows.sort((a, b) => a.latest.name.localeCompare(b.latest.name));
+  }
+  return [...groups.values()].sort(
+    (a, b) =>
+      a.experiment.localeCompare(b.experiment, undefined, { numeric: true }) ||
+      a.dataset.localeCompare(b.dataset) ||
+      Number(a.agent) - Number(b.agent),
+  );
 }
 
 /** 막대 축 최댓값: 고정값이 없으면 주어진 값 중 가장 큰 값(대시보드는 모든 실험 값을 준다). */

@@ -52,6 +52,17 @@ describe("groupRuns", () => {
       ["E10", false],
     ]);
   });
+
+  it("keeps runs of the same name on different datasets apart", () => {
+    const groups = groupRuns(
+      [run(1, "E6", "turns2", { agent: true }), run(2, "E6", "turns2", { agent: true, dataset_version: "human_v1" })],
+      "dev",
+    );
+    expect(groups.map((g) => [g.dataset, g.rows[0].latest.id, g.rows[0].count])).toEqual([
+      ["human_v1", 2, 1],
+      ["synthetic_v1", 1, 1],
+    ]);
+  });
 });
 
 describe("axisMax", () => {
