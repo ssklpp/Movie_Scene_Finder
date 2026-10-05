@@ -13,25 +13,28 @@ from app.db.session import SessionLocal
 
 router = APIRouter()
 
+# eval_runs 컬럼 중 그대로 돌려주는 것
+COLUMNS = (
+    "id",
+    "split",
+    "dataset_version",
+    "recall_at_1",
+    "recall_at_5",
+    "mrr",
+    "avg_clarify",
+    "p95_latency_ms",
+    "cost_per_query_usd",
+)
+
 
 def to_out(run: EvalRun) -> EvalRunOut:
     cfg = run.config or {}
     return EvalRunOut(
-        id=run.id,
+        **{c: getattr(run, c) for c in COLUMNS},
         experiment=str(cfg.get("experiment") or ""),
         name=str(cfg.get("name") or ""),
-        split=run.split or "",
-        dataset_version=run.dataset_version,
         agent=bool(cfg.get("agent")),
-        recall_at_1=run.recall_at_1,
-        recall_at_5=run.recall_at_5,
-        mrr=run.mrr,
-        clarify_success=run.clarify_success,
-        avg_clarify=run.avg_clarify,
-        p95_latency_ms=run.p95_latency_ms,
-        cost_per_query_usd=run.cost_per_query_usd,
         commit=cfg.get("commit"),
-        created_at=run.created_at,
     )
 
 

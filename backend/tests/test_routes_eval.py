@@ -22,7 +22,7 @@ def test_to_out_flattens_config() -> None:
     )
     out = to_out(run)
     assert (out.experiment, out.name, out.agent, out.commit) == ("E6", "turns2", True, "abc1234")
-    assert out.recall_at_1 == 0.86 and out.created_at == created
+    assert out.recall_at_1 == 0.86 and out.p95_latency_ms == 8400
 
 
 def test_to_out_handles_missing_config() -> None:

@@ -13,12 +13,10 @@ function run(id: number, experiment: string, name: string, extra: Partial<EvalRu
     recall_at_1: 0.2,
     recall_at_5: 0.4,
     mrr: 0.3,
-    clarify_success: null,
     avg_clarify: null,
     p95_latency_ms: 100,
     cost_per_query_usd: 0,
     commit: "abc",
-    created_at: "2026-10-05T00:00:00Z",
     ...extra,
   };
 }

@@ -1,5 +1,3 @@
-from datetime import datetime
-
 from pydantic import BaseModel
 
 
@@ -43,9 +41,7 @@ class EvalRunOut(BaseModel):
     recall_at_1: float | None
     recall_at_5: float | None
     mrr: float | None
-    clarify_success: float | None
     avg_clarify: float | None
     p95_latency_ms: int | None
     cost_per_query_usd: float | None
     commit: str | None
-    created_at: datetime

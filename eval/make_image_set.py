@@ -4,7 +4,7 @@
 - 앞 80개는 자동 변형이다. 변형 4종(crop, color, crop_color, degrade)을 20개씩 돌려 쓴다.
   결과는 eval/data/images/img-XXXX.jpg.
 - 뒤 20개는 모니터 촬영용이다. 원본을 eval/data/to_shoot/img-XXXX.jpg로 내보낸다. 사람이 이
-  원본을 모니터에 띄워 휴대폰으로 찍고, 사진을 eval/data/photos/img-XXXX.jpg(.jpeg/.png)로
+  원본을 모니터에 띄워 휴대폰으로 찍고, 사진을 eval/data/photos/img-XXXX.jpg로
   넣는다. 사진이 있는 것만 데이터셋에 들어가므로 사진을 넣은 뒤 다시 실행한다.
 - 촬영 사진(휴대폰 원본 5712x3213, 장당 3~4.5MB)은 긴 변 2048px, JPEG 품질 90으로 줄여
   eval/data/images/에 쓴다. OpenAI 비전 입력도 2048px 안으로 줄인 뒤 짧은 변 768px로 맞추므로
@@ -46,7 +46,6 @@ PHOTOS_DIR = DATA_DIR / "photos"  # 촬영 원본
 N_AUTO = 80
 N_MONITOR = 20
 TRANSFORMS = ("crop", "color", "crop_color", "degrade")
-PHOTO_SUFFIXES = (".jpg", ".jpeg", ".png")
 PHOTO_MAX_SIDE = 2048
 PHOTO_QUALITY = 90
 
@@ -130,14 +129,6 @@ def transform(img: Image.Image, kind: str, rng: random.Random) -> tuple[Image.Im
     raise ValueError(f"unknown transform: {kind}")
 
 
-def photo_path(pick_id: str, photos_dir: Path = PHOTOS_DIR) -> Path | None:
-    for suffix in PHOTO_SUFFIXES:
-        path = photos_dir / f"{pick_id}{suffix}"
-        if path.exists():
-            return path
-    return None
-
-
 def shrink_photo(img: Image.Image, max_side: int = PHOTO_MAX_SIDE) -> Image.Image:
     """EXIF 방향대로 세우고 긴 변을 max_side 이하로 줄인다(작으면 그대로)."""
     out = ImageOps.exif_transpose(img).convert("RGB")
@@ -172,8 +163,8 @@ def main() -> None:
             shoot = TO_SHOOT_DIR / f"{p.id}.jpg"
             if not shoot.exists():
                 shoot.write_bytes(src.read_bytes())
-            photo = photo_path(p.id)
-            if photo is None:
+            photo = PHOTOS_DIR / f"{p.id}.jpg"
+            if not photo.exists():
                 missing_photos.append(p.id)
                 continue
             path = IMAGES_DIR / f"{p.id}.jpg"

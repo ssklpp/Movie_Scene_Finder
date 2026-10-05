@@ -1,11 +1,9 @@
 import random
-from pathlib import Path
 
 from PIL import Image
 
 from eval.make_image_set import (
     TRANSFORMS,
-    photo_path,
     pick_scenes,
     shrink_photo,
     source_path,
@@ -46,12 +44,6 @@ def test_transforms_change_image() -> None:
         out, quality = transform(img, kind, random.Random(0))
         assert out.mode == "RGB" and 0 < quality <= 90
         assert out.size != img.size or out.getpixel((10, 10)) != img.getpixel((10, 10))
-
-
-def test_photo_path_accepts_jpeg_and_png(tmp_path: Path) -> None:
-    assert photo_path("img-0081", tmp_path) is None
-    (tmp_path / "img-0081.png").write_bytes(b"x")
-    assert photo_path("img-0081", tmp_path) == tmp_path / "img-0081.png"
 
 
 def test_shrink_photo_caps_long_side() -> None:

@@ -12,12 +12,10 @@ export type EvalRun = {
   recall_at_1: number | null;
   recall_at_5: number | null;
   mrr: number | null;
-  clarify_success: number | null;
   avg_clarify: number | null;
   p95_latency_ms: number | null;
   cost_per_query_usd: number | null;
   commit: string | null;
-  created_at: string;
 };
 
 export type MetricKey = "recall_at_1" | "recall_at_5" | "mrr" | "p95_latency_ms" | "cost_per_query_usd";
