@@ -203,6 +203,14 @@ def run_query(ex: Example, cfg: EvalConfig, tmdb_by_movie: dict[int, int]) -> Qu
     if ex.image_path:
         text, caption_cost = caption_query(REPO_ROOT / ex.image_path)
         query = f"{query}\n{text}".strip()
+    if not query:
+        # 모델이 캡션을 거부하면 검색할 내용이 없다(서비스는 안내 오류를 보낸다).
+        # 못 찾은 질의로 센다.
+        # API 오류(한도 초과 등)는 여기까지 오지 않고 평가를 멈춘다.
+        logger.warning("%s: nothing to search (caption refused)", ex.id)
+        return QueryResult(
+            ex.id, ex.dataset, ex.label, ex.answer_tmdb_id, None, [], 0, caption_cost
+        )
     result = retrieve(query, mode=cfg.mode)
     ranked = aggregate(
         result.scene_hits,

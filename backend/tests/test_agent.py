@@ -57,6 +57,7 @@ class Fakes:
         self.verify_calls = 0
         self.retrieve_calls: list[tuple[str, dict[str, str]]] = []
         self.chat_calls = 0
+        self.caption_fails = False
 
     def parse(self, messages: Any, fmt: type, **kw: Any) -> tuple[Any, CallStats]:
         if fmt is RewriteOutput:
@@ -74,6 +75,8 @@ class Fakes:
             items = [Verified(movie_id=m, score=s, reason=f"이유 {m}") for m, s in scores.items()]
             return VerifyOutput(items=items), STATS
         if fmt is SceneCaption:
+            if self.caption_fails:
+                raise RuntimeError("429 insufficient_quota")
             return SceneCaption(
                 caption_ko="비 오는 밤 반지하 창문 너머로 물이 차오르는 집 안이 보인다.",
                 caption_en="x",
@@ -201,6 +204,29 @@ def test_image_query_is_captioned_first(
     out = graph.invoke(initial_state("s1", None, key), CFG)
     assert out["image_caption"].setting == "반지하"
     assert out["result"][0].movie_id == 1
+
+
+def test_image_only_query_stops_when_caption_fails(
+    run: Callable[..., tuple[Any, Fakes]], monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    key = save_upload(b"\xff\xd8jpeg", ".jpg", tmp_path)
+    monkeypatch.setattr("app.agent.nodes.analyze.load_upload", lambda k: load_upload(k, tmp_path))
+    graph, fakes = run(lambda n: {1: 0.95})
+    fakes.caption_fails = True
+    out = graph.invoke(initial_state("s1", None, key), CFG)
+    assert out["result"] is None and out["rewritten"] is None
+    assert fakes.retrieve_calls == []  # 빈 질의로 검색(임베딩)하지 않는다
+
+
+def test_caption_failure_falls_back_to_text(
+    run: Callable[..., tuple[Any, Fakes]], monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    key = save_upload(b"\xff\xd8jpeg", ".jpg", tmp_path)
+    monkeypatch.setattr("app.agent.nodes.analyze.load_upload", lambda k: load_upload(k, tmp_path))
+    graph, fakes = run(lambda n: {1: 0.95})
+    fakes.caption_fails = True
+    out = graph.invoke(initial_state("s1", "반지하에 물 차는 장면", key), CFG)
+    assert out["image_caption"] is None and out["result"][0].movie_id == 1
 
 
 def test_answer_value_unknown_for_invalid_option() -> None:

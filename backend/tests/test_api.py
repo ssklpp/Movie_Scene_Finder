@@ -144,6 +144,26 @@ def test_search_with_image(
     assert events[-1][0] == "result"
 
 
+def test_unreadable_image_becomes_guidance_error(
+    client: Callable[..., Any], monkeypatch: pytest.MonkeyPatch, tmp_path: Any
+) -> None:
+    from app.core import uploads
+
+    monkeypatch.setattr(
+        "app.api.routes_search.save_upload", lambda d, s: uploads.save_upload(d, s, tmp_path)
+    )
+    monkeypatch.setattr(
+        "app.agent.nodes.analyze.load_upload", lambda k: uploads.load_upload(k, tmp_path)
+    )
+    tc, fakes, store = client(lambda n: {1: 0.95})
+    fakes.caption_fails = True
+    files = {"image": ("still.png", b"\x89PNG....", "image/png")}
+    events = parse_sse(tc.post("/search", files=files).text)
+    assert [n for n, _ in events] == ["session", "error"]
+    assert events[-1][1]["code"] == "image_unreadable"
+    assert len(store.finished) == 1  # 세션 비용·지연 기록은 남긴다
+
+
 def test_rate_limit_per_ip(client: Callable[..., Any], monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(get_settings(), "rate_limit_per_day", 2)
     tc, _, _ = client(lambda n: {1: 0.95})

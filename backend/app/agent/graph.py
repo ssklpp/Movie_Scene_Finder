@@ -1,6 +1,7 @@
 """검색 에이전트 그래프 (SPEC §8.2).
 
     START → analyze_input → rewrite_query → retrieve → aggregate → verify
+    analyze_input --(텍스트도 사진 캡션도 없음: 사진만 보냈는데 캡션 실패)--> END
     verify --(확신도 ≥ 임계값 / 재질문 횟수 소진 / 엔트로피 0)--> answer → END
     verify --(그 외)--> ask → clarify(interrupt) → retrieve
 
@@ -23,6 +24,16 @@ from app.agent.nodes.verify import route_after_verify, verify
 from app.agent.state import SearchState
 
 
+def has_query(state: SearchState) -> bool:
+    """검색할 내용(텍스트 또는 사진 캡션)이 있는가."""
+    return bool((state.get("query_text") or "").strip()) or state.get("image_caption") is not None
+
+
+def route_after_analyze(state: SearchState) -> str:
+    # 검색할 내용이 없으면 빈 질의로 임베딩·LLM을 부르지 않고 끝낸다(runtime이 안내 오류를 보낸다).
+    return "rewrite_query" if has_query(state) else END
+
+
 def build_graph(checkpointer: BaseCheckpointSaver[Any]) -> CompiledStateGraph[Any, Any, Any, Any]:
     g = StateGraph(SearchState)
     g.add_node("analyze_input", analyze_input)
@@ -35,7 +46,9 @@ def build_graph(checkpointer: BaseCheckpointSaver[Any]) -> CompiledStateGraph[An
     g.add_node("answer", answer)
 
     g.add_edge(START, "analyze_input")
-    g.add_edge("analyze_input", "rewrite_query")
+    g.add_conditional_edges(
+        "analyze_input", route_after_analyze, {"rewrite_query": "rewrite_query", END: END}
+    )
     g.add_edge("rewrite_query", "retrieve")
     g.add_edge("retrieve", "aggregate")
     g.add_edge("aggregate", "verify")

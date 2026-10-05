@@ -14,7 +14,7 @@ from typing import Any, Protocol
 from langchain_core.runnables import RunnableConfig
 from langgraph.types import Command
 
-from app.agent.graph import build_graph, initial_state
+from app.agent.graph import build_graph, has_query, initial_state
 from app.agent.state import Question, ResultItem, SearchState
 from app.db.models import Session as SessionRow
 from app.db.session import SessionLocal
@@ -30,6 +30,9 @@ STATUS = {
 }
 REQUEST_TIMEOUT_S = 30.0
 TIMEOUT_MESSAGE = "처리 시간이 30초를 넘었어요."
+IMAGE_UNREADABLE_MESSAGE = (
+    "사진에서 장면을 읽지 못했어요. 다른 사진을 올리거나 기억나는 장면을 글로 적어 주세요."
+)
 
 
 # {"event": 이름, "data": JSON으로 보낼 dict}
@@ -157,4 +160,9 @@ class AgentRuntime:
             yield question_event(q)
             return
         self.store.finish(session_id, state)
+        if not has_query(state):
+            # 사진만 보냈는데 캡션을 못 만들었다. 같은 사진으로는 다시 해도 소용없어
+            # 다른 방법을 안내한다.
+            yield event("error", {"code": "image_unreadable", "message": IMAGE_UNREADABLE_MESSAGE})
+            return
         yield result_event(state.get("result") or [], state.get("confidence", 0.0))

@@ -55,7 +55,9 @@ export default function SceneSearch() {
           setError(
             e.data.code === "timeout"
               ? "찾는 데 너무 오래 걸렸어요. 다시 찾아 주세요."
-              : "검색 중에 문제가 생겼어요. 다시 찾아 주세요.",
+              : e.data.code === "image_unreadable"
+                ? e.data.message
+                : "검색 중에 문제가 생겼어요. 다시 찾아 주세요.",
           );
           setPhase("error");
         }
