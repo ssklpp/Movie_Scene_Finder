@@ -26,11 +26,16 @@ def psycopg_url(sqlalchemy_url: str) -> str:
 
 
 def pooled_checkpointer() -> tuple[PostgresSaver, ConnectionPool[Connection[DictRow]]]:
-    """API 서버용: 동시 요청을 위해 연결 풀을 쓴다. 풀은 호출한 쪽이 닫는다."""
+    """API 서버용: 동시 요청을 위해 연결 풀을 쓴다. 풀은 호출한 쪽이 닫는다.
+
+    연결을 빌려줄 때마다 살아 있는지 확인한다(check). 없으면 DB가 재시작된 뒤(배포 DB의 TCP
+    Proxy를 켜고 끌 때 등) 끊긴 연결이 그대로 쓰여 요청이 AdminShutdown으로 실패했다.
+    """
     pool: ConnectionPool[Connection[DictRow]] = ConnectionPool(
         psycopg_url(get_settings().database_url),
         kwargs={"autocommit": True, "prepare_threshold": 0, "row_factory": dict_row},
         max_size=10,
+        check=ConnectionPool.check_connection,
         open=True,
     )
     saver = PostgresSaver(pool, serde=make_serde())
