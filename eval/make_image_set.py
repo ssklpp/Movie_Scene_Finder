@@ -9,7 +9,9 @@
 - 촬영 사진(휴대폰 원본 5712x3213, 장당 3~4.5MB)은 긴 변 2048px, JPEG 품질 90으로 줄여
   eval/data/images/에 쓴다. OpenAI 비전 입력도 2048px 안으로 줄인 뒤 짧은 변 768px로 맞추므로
   모델이 보는 정보는 같고, 서비스 업로드 한도(5MB)에 들어오는 크기가 된다.
-- split은 번호 순으로 dev/test를 번갈아 준다(자동 40/40, 촬영 10/10).
+- split은 변형 종류마다 번갈아 준다(자동 종류별 dev 10 / test 10, 촬영 10 / 10). 처음에는
+  번호 순으로 번갈아 줘서 변형 순환(4개 주기)과 겹쳐 dev에 crop·crop_color만, test에
+  color·degrade만 들어갔다.
 - 이미지는 TMDB 저작물이라 git에 넣지 않는다(eval/data/). 데이터셋 jsonl만 저장소에 둔다.
   같은 시드·같은 DB면 같은 장면과 같은 변형이 다시 만들어진다.
 
@@ -75,8 +77,11 @@ def pick_scenes(
     picks = []
     for i, (movie_id, tmdb_id) in enumerate(chosen):
         scene_id = rng.choice(sorted(scenes_by_movie[(movie_id, tmdb_id)]))
-        kind = TRANSFORMS[i % len(TRANSFORMS)] if i < n_auto else "monitor"
-        split = "dev" if i % 2 == 0 else "test"
+        if i < n_auto:
+            kind, nth = TRANSFORMS[i % len(TRANSFORMS)], i // len(TRANSFORMS)
+        else:
+            kind, nth = "monitor", i - n_auto
+        split = "dev" if nth % 2 == 0 else "test"  # 같은 종류 안에서 번갈아
         picks.append(Pick(f"img-{i + 1:04d}", scene_id, movie_id, tmdb_id, kind, split))
     return picks
 

@@ -26,8 +26,10 @@ def test_pick_scenes_is_deterministic_and_splits_evenly() -> None:
     assert {p.kind for p in monitor} == {"monitor"}
     for kind in TRANSFORMS:
         assert sum(p.kind == kind for p in auto) == 20
-    for group in (auto, monitor):
-        assert sum(p.split == "dev" for p in group) == len(group) // 2
+    # 변형 종류마다 dev/test가 반씩(종류가 한쪽 split에 몰리지 않게)
+    for kind in (*TRANSFORMS, "monitor"):
+        same = [p for p in picks if p.kind == kind]
+        assert sum(p.split == "dev" for p in same) == len(same) // 2
     assert picks[0].id == "img-0001" and picks[-1].id == "img-0100"
     for p in picks:
         assert p.scene_id.startswith(f"{p.tmdb_id}_")
