@@ -18,3 +18,33 @@
 {"id": "human-0018", "query": "잠입하기 위해서 며칠 동안 버티고 또 버티던거", "image_path": null, "answer_movie_id": 2, "answer_tmdb_id": 1368337, "source": "human", "split": "test", "version": "v1", "writer": "HJ"}
 {"id": "human-0019", "query": "전투기를 타고 뒤집어진채로 활강하던거", "image_path": null, "answer_movie_id": 66, "answer_tmdb_id": 361743, "source": "human", "split": "test", "version": "v1", "writer": "HJ"}
 {"id": "human-0020", "query": "자동차로 추격하면서 눈이 마주치는 장면", "image_path": null, "answer_movie_id": 8, "answer_tmdb_id": 1058424, "source": "human", "split": "test", "version": "v1", "writer": "HJ"}
+{"id": "human-0021", "query": "좀비들이 뛰어오는 장면", "image_path": null, "answer_movie_id": 286, "answer_tmdb_id": 170, "source": "human", "split": "test", "version": "v1", "writer": "TK"}
+{"id": "human-0022", "query": "의자에 앉아서 눈물 흘리는 장면", "image_path": null, "answer_movie_id": 260, "answer_tmdb_id": 419430, "source": "human", "split": "test", "version": "v1", "writer": "TK"}
+{"id": "human-0023", "query": "눈이 내리면서 걷는 장면", "image_path": null, "answer_movie_id": 224, "answer_tmdb_id": 330457, "source": "human", "split": "test", "version": "v1", "writer": "TK"}
+{"id": "human-0024", "query": "폭포를 맞고있는 악마가 나오는 장면", "image_path": null, "answer_movie_id": 63, "answer_tmdb_id": 293670, "source": "human", "split": "test", "version": "v1", "writer": "TK"}
+{"id": "human-0025", "query": "군인들이 서로 웃으며 사진 찍는 장면", "image_path": null, "answer_movie_id": 283, "answer_tmdb_id": 2440, "source": "human", "split": "test", "version": "v1", "writer": "TK"}
+{"id": "human-0026", "query": "두 명이 의자에 앉아서 편하게 이야기하는 장면", "image_path": null, "answer_movie_id": 255, "answer_tmdb_id": 489, "source": "human", "split": "test", "version": "v1", "writer": "SK"}
+{"id": "human-0027", "query": "깊이를 알 수 없는 성 안으로 떨어지는 장면", "image_path": null, "answer_movie_id": 29, "answer_tmdb_id": 1311031, "source": "human", "split": "test", "version": "v1", "writer": "SK"}
+{"id": "human-0028", "query": "맞아도 맞아도 쓰러지지 않는 경찰이 나오는 장면", "image_path": null, "answer_movie_id": 18, "answer_tmdb_id": 567646, "source": "human", "split": "test", "version": "v1", "writer": "SK"}
+{"id": "human-0029", "query": "마술사들이 모여서 마술을 보여주는 장면", "image_path": null, "answer_movie_id": 270, "answer_tmdb_id": 425274, "source": "human", "split": "test", "version": "v1", "writer": "SK"}
+{"id": "human-0030", "query": "절벽을 오르기 위해 노력을 하는 장면", "image_path": null, "answer_movie_id": 159, "answer_tmdb_id": 49026, "source": "human", "split": "test", "version": "v1", "writer": "SK"}
+{"id": "human-0031", "query": "비행기에서 단체로 뛰어내리는 장면", "image_path": null, "answer_movie_id": 231, "answer_tmdb_id": 383498, "source": "human", "split": "test", "version": "v1", "writer": "JS"}
+{"id": "human-0032", "query": "아주 큰 벌레를 길들이는 장면", "image_path": null, "answer_movie_id": 56, "answer_tmdb_id": 438631, "source": "human", "split": "test", "version": "v1", "writer": "JS"}
+{"id": "human-0033", "query": "칼을 겨누며 서로 싸우는 장면", "image_path": null, "answer_movie_id": 39, "answer_tmdb_id": 693134, "source": "human", "split": "test", "version": "v1", "writer": "JS"}
+{"id": "human-0034", "query": "풀밭에 알 수 없는 무늬가 생기는 장면", "image_path": null, "answer_movie_id": 20, "answer_tmdb_id": 1275779, "source": "human", "split": "test", "version": "v1", "writer": "JS"}
+{"id": "human-0035", "query": "배우 두 명이 서로 춤을 추는 장면", "image_path": null, "answer_movie_id": 294, "answer_tmdb_id": 313369, "source": "human", "split": "test", "version": "v1", "writer": "JS"}
+{"id": "human-0036", "query": "아저씨와 어린 여자아이가 도시를 걷는 장면", "image_path": null, "answer_movie_id": 147, "answer_tmdb_id": 101, "source": "human", "split": "test", "version": "v1", "writer": "HS"}
+{"id": "human-0037", "query": "무대에서 노래부르며 안무하는 장면", "image_path": null, "answer_movie_id": 60, "answer_tmdb_id": 936075, "source": "human", "split": "test", "version": "v1", "writer": "HS"}
+{"id": "human-0038", "query": "덩치가 큰 로봇을 쓰러뜨리는 장면", "image_path": null, "answer_movie_id": 25, "answer_tmdb_id": 1228710, "source": "human", "split": "test", "version": "v1", "writer": "HS"}
+{"id": "human-0039", "query": "거대한 기계들이 함선을 공격하는 장면", "image_path": null, "answer_movie_id": 40, "answer_tmdb_id": 603, "source": "human", "split": "test", "version": "v1", "writer": "HS"}
+{"id": "human-0040", "query": "비행기에 메달리며 버티는 장면", "image_path": null, "answer_movie_id": 140, "answer_tmdb_id": 575265, "source": "human", "split": "test", "version": "v1", "writer": "HS"}
+{"id": "human-0041", "query": "군복입은 군인들이 식사하는 장면", "image_path": null, "answer_movie_id": 256, "answer_tmdb_id": 16869, "source": "human", "split": "test", "version": "v1", "writer": "SH"}
+{"id": "human-0042", "query": "어두운 복장을 한 인물이 뛰어내리는 장면", "image_path": null, "answer_movie_id": 234, "answer_tmdb_id": 272, "source": "human", "split": "test", "version": "v1", "writer": "SH"}
+{"id": "human-0043", "query": "자동차들이 도로 경주를 하는 장면", "image_path": null, "answer_movie_id": 136, "answer_tmdb_id": 385687, "source": "human", "split": "test", "version": "v1", "writer": "SH"}
+{"id": "human-0044", "query": "홀로그램 캐릭터가 손가락을 내미는 장면", "image_path": null, "answer_movie_id": 19, "answer_tmdb_id": 335984, "source": "human", "split": "test", "version": "v1", "writer": "SH"}
+{"id": "human-0045", "query": "어둡고 좁은 열차 칸에서 검은색 바 음식을 먹는 장면", "image_path": null, "answer_movie_id": 43, "answer_tmdb_id": 110415, "source": "human", "split": "test", "version": "v1", "writer": "SH"}
+{"id": "human-0046", "query": "시원하게 날라다니며 축구하는 장면", "image_path": null, "answer_movie_id": 199, "answer_tmdb_id": 11770, "source": "human", "split": "test", "version": "v1", "writer": "JK"}
+{"id": "human-0047", "query": "비가 내리는 밤에 하늘을 보며 환호하는 주인공", "image_path": null, "answer_movie_id": 31, "answer_tmdb_id": 278, "source": "human", "split": "test", "version": "v1", "writer": "JK"}
+{"id": "human-0048", "query": "우주선에서 싸우는 주인공들", "image_path": null, "answer_movie_id": 127, "answer_tmdb_id": 939243, "source": "human", "split": "test", "version": "v1", "writer": "JK"}
+{"id": "human-0049", "query": "엘리베이터 안에서 피를 흘리는 배우", "image_path": null, "answer_movie_id": 258, "answer_tmdb_id": 165213, "source": "human", "split": "test", "version": "v1", "writer": "JK"}
+{"id": "human-0050", "query": "외계인과 사투를 벌이는 배우", "image_path": null, "answer_movie_id": 144, "answer_tmdb_id": 126889, "source": "human", "split": "test", "version": "v1", "writer": "JK"}
