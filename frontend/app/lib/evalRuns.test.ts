@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { METRICS, axisMax, formatUsd, groupRuns, type EvalRun } from "./evalRuns";
+import { METRICS, axisMax, formatUsd, groupRuns, headline, type EvalRun } from "./evalRuns";
 
 function run(id: number, experiment: string, name: string, extra: Partial<EvalRun> = {}): EvalRun {
   return {
@@ -79,5 +79,17 @@ describe("formatUsd", () => {
     expect(formatUsd(1.2393e-6)).toBe("$0.0000012");
     expect(formatUsd(0.00062)).toBe("$0.00062");
     expect(formatUsd(0)).toBe("$0");
+  });
+});
+
+describe("headline", () => {
+  it("picks the latest run of each operating setting in the split", () => {
+    const runs = [
+      run(1, "E3", "caption_both_agent", { agent: true, recall_at_1: 0.86 }),
+      run(5, "E3", "caption_both_agent", { agent: true, recall_at_1: 0.88 }),
+      run(6, "IMG", "agent_turns2", { split: "test", recall_at_1: 0.9 }),
+    ];
+    expect(headline(runs, "dev").map((h) => [h.label, h.run.id])).toEqual([["기억 묘사", 5]]);
+    expect(headline(runs, "test").map((h) => [h.label, h.run.id])).toEqual([["사진", 6]]);
   });
 });

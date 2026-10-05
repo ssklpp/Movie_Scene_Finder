@@ -36,17 +36,71 @@ export const METRICS: Metric[] = [
   { key: "cost_per_query_usd", label: "질의당 비용", format: formatUsd },
 ];
 
-// SPEC §11 실험 설정 표
-export const EXPERIMENTS: Record<string, string> = {
-  E1: "검색 방식",
-  E2: "캡션 모델",
-  E3: "검색 문서 언어",
-  E4: "토크나이저",
-  E5: "줄거리 가중치 W_PLOT",
-  E6: "최대 재질문 횟수",
-  E7: "임베딩 차원",
-  IMG: "이미지 질의",
+/** 실험(SPEC §11)의 이름, 결론, 운영에 쓰는 설정 이름. 결론은 CLAUDE.md의 실험 기록과 같다. */
+export type Experiment = { title: string; decision?: string; chosen?: string[] };
+
+export const EXPERIMENTS: Record<string, Experiment> = {
+  E1: {
+    title: "검색 방식",
+    decision: "하이브리드(dense + BM25)가 dense만 쓸 때보다 첫 번째 적중이 두 배라 하이브리드로 검색한다.",
+    chosen: ["hybrid"],
+  },
+  E2: { title: "캡션 모델" },
+  E3: {
+    title: "검색 문서 언어",
+    decision: "장면 문서에 한국어와 영어 캡션을 함께 넣었다. 검색만 했을 때 첫 번째 적중이 0.205에서 0.255로 올랐다.",
+    chosen: ["caption_both", "caption_both_agent"],
+  },
+  E4: {
+    title: "토크나이저",
+    decision: "합성 질의에는 제목·인물 이름이 없어 사용자 사전의 효과가 없지만, 사람이 쓴 질의를 위해 유지한다.",
+    chosen: ["kiwi_dict"],
+  },
+  E5: {
+    title: "줄거리 가중치 W_PLOT",
+    decision: "0이 조금 낫지만 흔들림 범위다. 사진에 없는 장면은 줄거리로만 찾을 수 있어 0.5를 유지한다.",
+    chosen: ["wplot_0.5", "wplot_0.5_agent"],
+  },
+  E6: {
+    title: "최대 재질문 횟수",
+    decision: "재질문은 2회까지. 재작성·검증의 추론을 꺼도 정확도는 같고 오래 걸리는 요청이 사라졌다.",
+    chosen: ["turns2_all_none"],
+  },
+  E7: {
+    title: "임베딩 차원",
+    decision: "512차원은 상위 5위 적중이 4.5%p 낮아 1536차원을 유지한다.",
+    chosen: ["dim_1536"],
+  },
+  IMG: {
+    title: "이미지 질의",
+    decision: "사진 캡션의 추론을 끄면 0.5~2초 빨라지지만 정확도가 조금 낮아 지금 설정을 유지한다.",
+    chosen: ["search_hybrid", "agent_turns2"],
+  },
 };
+
+/** 화면에 보일 데이터셋 이름 */
+export const DATASETS: Record<string, string> = {
+  synthetic_v1: "합성 기억 묘사",
+  human_v1: "사람이 쓴 묘사",
+  image_v1: "사진",
+};
+
+/** 맨 위 자막에 쓰는 운영 설정 실행: 텍스트(에이전트)와 사진(에이전트) */
+const HEADLINE = [
+  { experiment: "E3", name: "caption_both_agent", label: "기억 묘사" },
+  { experiment: "IMG", name: "agent_turns2", label: "사진" },
+];
+
+/** split의 운영 설정 결과(설정마다 최신 실행). 없는 것은 빠진다. */
+export function headline(runs: EvalRun[], split: string): { label: string; run: EvalRun }[] {
+  return HEADLINE.flatMap(({ experiment, name, label }) => {
+    const matches = runs.filter(
+      (r) => r.split === split && r.experiment === experiment && r.name === name,
+    );
+    if (!matches.length) return [];
+    return [{ label, run: matches.reduce((a, b) => (b.id > a.id ? b : a)) }];
+  });
+}
 
 /** 같은 실험·split·데이터셋·평가 방식(검색만/에이전트)의 설정별 최신 실행과 실행 횟수. */
 export type Group = {
