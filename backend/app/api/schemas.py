@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel
 
 
@@ -29,3 +31,21 @@ class MovieDetail(BaseModel):
     plot_ko: str | None
     poster_url: str | None
     scenes: list[SceneOut]
+
+
+class EvalRunOut(BaseModel):
+    id: int
+    experiment: str
+    name: str
+    split: str
+    dataset_version: str | None
+    agent: bool
+    recall_at_1: float | None
+    recall_at_5: float | None
+    mrr: float | None
+    clarify_success: float | None
+    avg_clarify: float | None
+    p95_latency_ms: int | None
+    cost_per_query_usd: float | None
+    commit: str | None
+    created_at: datetime

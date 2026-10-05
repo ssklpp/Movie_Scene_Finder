@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
-from app.api import routes_feedback, routes_movies, routes_search
+from app.api import routes_eval, routes_feedback, routes_movies, routes_search
 from app.core.config import get_settings
 from app.core.logging import setup_logging
 from app.core.tracing import setup_tracing
@@ -43,6 +43,7 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # ty
 app.include_router(routes_search.router)
 app.include_router(routes_feedback.router)
 app.include_router(routes_movies.router)
+app.include_router(routes_eval.router)
 
 
 @app.get("/health")
