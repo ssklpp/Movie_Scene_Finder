@@ -3,3 +3,4 @@ experiment: IMG
 name: agent_turns2
 agent: true
 max_clarify_turns: 2
+image_skip_rewrite: false  # 기본값이 true로 바뀐 뒤에도 처음(재작성 있음)과 같은 조건으로 비교한다

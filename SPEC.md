@@ -151,6 +151,10 @@ SOFT_FILTER_BOOST=1.1
 # 에이전트 LLM 추론 강도: none | low | medium | high
 REWRITE_REASONING_EFFORT=none
 VERIFY_REASONING_EFFORT=none
+# 이미지 질의 캡션 추론 강도(색인 캡션 s04는 low 고정)
+IMAGE_CAPTION_REASONING_EFFORT=low
+# 사진만 보낸 질의는 재작성(LLM)을 건너뛰고 캡션으로 바로 검색
+IMAGE_SKIP_REWRITE=true
 
 # Ops
 RATE_LIMIT_PER_DAY=30
@@ -330,7 +334,7 @@ class SearchState(TypedDict):
 | 노드 | 처리 | 모델 |
 | --- | --- | --- |
 | `analyze_input` | 이미지가 있으면 `SceneCaption` 생성 | gpt-6-luna (vision) |
-| `rewrite_query` | 텍스트 + 이미지 캡션 → `Rewritten` | gpt-6-luna |
+| `rewrite_query` | 텍스트 + 이미지 캡션 → `Rewritten`. 텍스트 없이 사진만 있으면 LLM 없이 캡션(한·영)을 검색 문장, 장소·물건을 키워드로 쓴다(`IMAGE_SKIP_REWRITE`, 지연시간) | gpt-6-luna |
 | `retrieve` | §7.3 | Qdrant + 임베딩 |
 | `aggregate` | §7.4 | 코드 |
 | `verify` | §7.5 | gpt-6-luna |

@@ -73,8 +73,9 @@ export const EXPERIMENTS: Record<string, Experiment> = {
   },
   IMG: {
     title: "이미지 질의",
-    decision: "사진 캡션의 추론을 끄면 0.5~2초 빨라지지만 정확도가 조금 낮아 지금 설정을 유지한다.",
-    chosen: ["search_hybrid", "agent_turns2"],
+    decision:
+      "사진만 있는 질의는 재작성 없이 캡션으로 바로 검색한다. 정확도는 같고 요청이 약 2.5초 빨라졌다. 캡션 추론은 끄면 정확도가 조금 낮아 유지한다.",
+    chosen: ["search_hybrid", "agent_turns2_skip_rewrite"],
   },
 };
 
@@ -88,7 +89,7 @@ export const DATASETS: Record<string, string> = {
 /** 맨 위 자막에 쓰는 운영 설정 실행: 텍스트(에이전트)와 사진(에이전트) */
 const HEADLINE = [
   { experiment: "E3", name: "caption_both_agent", label: "기억 묘사" },
-  { experiment: "IMG", name: "agent_turns2", label: "사진" },
+  { experiment: "IMG", name: "agent_turns2_skip_rewrite", label: "사진" },
 ];
 
 /** split의 운영 설정 결과(설정마다 최신 실행). 없는 것은 빠진다. */

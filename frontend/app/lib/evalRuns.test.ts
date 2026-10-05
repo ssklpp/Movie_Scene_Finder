@@ -87,7 +87,7 @@ describe("headline", () => {
     const runs = [
       run(1, "E3", "caption_both_agent", { agent: true, recall_at_1: 0.86 }),
       run(5, "E3", "caption_both_agent", { agent: true, recall_at_1: 0.88 }),
-      run(6, "IMG", "agent_turns2", { split: "test", recall_at_1: 0.9 }),
+      run(6, "IMG", "agent_turns2_skip_rewrite", { split: "test", recall_at_1: 0.9 }),
     ];
     expect(headline(runs, "dev").map((h) => [h.label, h.run.id])).toEqual([["기억 묘사", 5]]);
     expect(headline(runs, "test").map((h) => [h.label, h.run.id])).toEqual([["사진", 6]]);
