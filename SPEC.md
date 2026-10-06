@@ -415,9 +415,9 @@ event: error      data: {"code": "...", "message": "..."}
 | ID | 비교 대상 |
 | --- | --- |
 | E1 | dense only / sparse only / hybrid RRF |
-| E2 | 캡션 모델: Qwen3-VL-4B / CapRL-Qwen3VL-4B / gpt-6-luna |
+| E2 | 캡션 모델: Qwen3-VL-4B(AWQ 4비트) / gpt-6-luna. CapRL-Qwen3VL-4B는 VRAM 8GB에 맞는 vLLM용 양자화본이 없어 제외 |
 | E3 | 검색 문서 언어: caption_ko / caption_en / 둘 다 |
-| E4 | 토크나이저: Kiwi / Kiwi+사용자 사전 / MeCab-ko / 문자 2-gram |
+| E4 | 토크나이저: Kiwi / Kiwi+사용자 사전 / 문자 2-gram (MeCab-ko는 제외) |
 | E5 | W_PLOT: 0 / 0.5 / 1.0 |
 | E6 | MAX_CLARIFY_TURNS: 0 / 1 / 2 |
 | E7 | EMBED_DIM: 512 / 1536 |
@@ -508,8 +508,8 @@ ss -ltn | grep -E ':(5432|6333|8000|8001|3000)\s' || echo "ports free"
 
 - [ ] E2~E5, E7 실행 → dev로 파라미터 확정 → test(synthetic test + human + image)로 최종 측정 1회
 - [ ] `/eval` 대시보드
-- [ ] `README.md`: 한 줄 소개, 데모 GIF, 아키텍처 그림, 실행 방법, 최종 평가표, 실험 결과 요약(E1~E7), 질의당 비용·월 운영비, 실패 사례 유형 분석, 한계와 다음 단계, 데이터 출처·라이선스
-- [ ] 2분 데모 영상 (텍스트 질의 → 재질문 → 결과, 이미지 질의, 평가 대시보드)
+- [ ] `README.md`: 한 줄 소개, 아키텍처 그림, 실행 방법, 최종 평가표, 실험 결과 요약(E1~E7), 질의당 비용·월 운영비, 실패 사례 유형 분석, 한계와 다음 단계, 데이터 출처·라이선스
+- 데모 영상·GIF는 만들지 않는다(처음에는 2분 데모 영상과 README 데모 GIF가 있었으나 제외). 공개 URL과 `/eval` 대시보드로 대신한다.
 - [ ] `v1.0.0` 태그, GitHub Release
 
 **프로젝트 종료 체크리스트**
