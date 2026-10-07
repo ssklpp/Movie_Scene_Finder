@@ -176,7 +176,8 @@ LANGSMITH_PROJECT=movie-scene-finder
 movies(
   id SERIAL PK, tmdb_id INT UNIQUE, title_ko TEXT, title_en TEXT,
   year INT, country TEXT, genres TEXT[], is_animation BOOL,
-  plot_ko TEXT, poster_url TEXT
+  plot_ko TEXT, poster_url TEXT,
+  kmdb_id TEXT, plot_kmdb TEXT, keywords_ko TEXT[]   -- KMDb 보강(s01), 매칭 안 되면 NULL
 )
 scenes(
   id TEXT PK,                 -- f"{tmdb_id}_{source}_{n}"
@@ -235,7 +236,7 @@ class SceneCaption(BaseModel):
 
 | 스크립트 | 입력 | 처리 | 출력 |
 | --- | --- | --- | --- |
-| s01_collect_meta | TMDB discover (인기순, KR 포함 300편) | 상세·장르·국가·줄거리 수집, KMDb로 한국어 줄거리 보강 | `movies` 테이블 |
+| s01_collect_meta | TMDB discover (인기순, KR 포함 300편) | 상세·장르·국가·줄거리 수집, KMDb에서 같은 영화(제목·연도 ±1·국가)를 찾아 한국어 줄거리·키워드 보강(`--kmdb-only`: 기존 카탈로그만 보강) | `movies` 테이블, `reports/kmdb_match.csv` |
 | s02_collect_images | movies | TMDB images에서 backdrop 최대 15장 다운로드 (TMDB 영화에는 still이 없음. `--with-trailers` 시 PySceneDetect 키프레임 추가) | `pipeline/data/images/` |
 | s03_dedup | 이미지 | pHash 계산, 같은 영화 내 해밍 거리 ≤ 20 묶음에서 대표 1장 (backdrop에 자르기·확대·색 보정 사본이 많아 8로는 거의 걸러지지 않음) | `scenes` 행(캡션 비어 있음) |
 | (build_user_dict) | movies | 제목 + 영화별 주요 배우 10명·감독의 한글 이름으로 Kiwi 사용자 사전 생성. s03 다음에 실행 | `backend/app/search/data/user_dict.txt` (저장소 포함, 배포 backend도 사용) |

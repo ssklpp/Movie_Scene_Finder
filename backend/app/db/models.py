@@ -37,6 +37,10 @@ class Movie(Base):
     is_animation: Mapped[bool | None]
     plot_ko: Mapped[str | None] = mapped_column(Text)
     poster_url: Mapped[str | None] = mapped_column(Text)
+    # KMDb 보강(s01). 매칭되지 않은 영화는 비어 있다.
+    kmdb_id: Mapped[str | None] = mapped_column(Text)
+    plot_kmdb: Mapped[str | None] = mapped_column(Text)
+    keywords_ko: Mapped[list[str] | None] = mapped_column(ARRAY(Text))
 
 
 class Scene(Base):
