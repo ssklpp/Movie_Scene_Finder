@@ -4,7 +4,13 @@ from typing import Any
 import pytest
 
 from app.core.llm import CallStats
-from pipeline.s07_embed import embed_with_cache, load_dense_cache, text_hash, write_parquet
+from pipeline.s07_embed import (
+    embed_with_cache,
+    load_dense_cache,
+    movie_doc,
+    text_hash,
+    write_parquet,
+)
 
 
 def test_text_hash_depends_on_model_and_dim() -> None:
@@ -45,3 +51,10 @@ def test_parquet_roundtrip_reuses_dense(tmp_path: Path) -> None:
     )
     assert load_dense_cache(path) == {"h1": [0.5, 1.0], "h2": [2.0, 3.0]}
     assert not path.with_suffix(".part").exists()
+
+
+def test_movie_doc_appends_keywords() -> None:
+    assert movie_doc("줄거리", ["양궁", "한강"]) == "줄거리\n양궁, 한강"
+    assert movie_doc("줄거리", None) == "줄거리"
+    assert movie_doc(None, ["양궁"]) == "양궁"
+    assert movie_doc(None, []) == ""

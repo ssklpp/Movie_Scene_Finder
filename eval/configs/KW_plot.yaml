@@ -1,0 +1,4 @@
+# KMDb 키워드 실험: 줄거리(movies) 문서 = plot. 운영 문서 언어(ko + en) 기준.
+experiment: KW
+name: plot
+index: {doc_lang: both}

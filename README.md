@@ -101,10 +101,16 @@ flowchart LR
 | E6 최대 재질문 | 0 / 1 / 2회 | 2회. 에이전트 R@1 0.815 / 0.825 / 0.860 |
 | E7 임베딩 차원 | 512 / 1536 | 1536. 512는 R@5 −4.5%p |
 | 사진 질의 | 캡션 추론, 재작성 생략 | 재작성 생략: 정확도는 같고 요청 약 2.5초 단축 |
+| KW 줄거리 키워드 (v1.0.0 이후) | 줄거리 / 줄거리 + KMDb 키워드 | 줄거리 + 키워드. dev는 같고(R@5 0.420 / 0.415), 사람 질의 검색만 R@5 0.16 → 0.20, MRR 0.125 → 0.151 (아래 참고) |
 
 **응답 시간 줄이기**: 요청 시간의 대부분은 LLM 출력 토큰에 비례했습니다. 검증 출력을 줄이고(740 → 190토큰),
 재질문 문장을 고정 문장으로 바꾸고, 재작성·검증 LLM의 추론을 끄고(`reasoning_effort=none`), 서버 시작 때
 연결을 미리 준비해 첫 요청 중간값을 약 10초에서 4.2초로 줄였습니다. 정확도 차이는 실행 간 흔들림 범위였습니다.
+
+**KW 실험은 test를 다시 쓴 참고 수치입니다.** 사람 질의는 test 50개뿐이고 dev 합성 질의로는 줄거리 효과가
+드러나지 않아, 변형 하나만 미리 정한 기준으로 한 번 비교했습니다. 에이전트 R@1은 두 번씩 돌려 0.38·0.26 →
+0.42·0.34였습니다(같은 설정도 실행마다 0.12까지 흔들림). 위 [결과 요약](#결과-요약)의 test 수치는 v1.0.0
+최종 측정 그대로이며 이 변경을 반영하지 않습니다.
 
 자세한 기록은 [CLAUDE.md](CLAUDE.md)의 구현 메모, 오류와 해결 과정은 [docs/troubleshooting.md](docs/troubleshooting.md)에 있습니다.
 
@@ -188,7 +194,7 @@ make dev                       # backend(:8000) + frontend(:3000)
 `make index`가 아래 단계를 순서대로 실행합니다.
 
 ```bash
-uv run python -m pipeline.s01_collect_meta      # 영화 메타데이터 → movies
+uv run python -m pipeline.s01_collect_meta      # 영화 메타데이터 → movies (+ KMDb 키워드)
 uv run python -m pipeline.s02_collect_images    # 영화별 장면 이미지 최대 15장
 uv run python -m pipeline.s03_dedup             # 비슷한 이미지 제거 → scenes
 uv run python -m pipeline.build_user_dict       # 제목·인물명 형태소 분석 사전
@@ -203,6 +209,8 @@ uv run python -m pipeline.s08_upload            # Qdrant 적재, 썸네일 R2 �
 - 다시 실행하면 처리한 항목은 건너뜁니다(진행 상태는 `pipeline/data/state.sqlite`).
 - 수집한 이미지와 중간 결과(`pipeline/data/`)는 저장소에 올리지 않습니다.
 - 썸네일 업로드는 `.env`에 R2 키가 있을 때만 합니다. 없으면 결과 화면에 캡션만 나옵니다.
+- KMDb 보강은 `.env`에 `KMDB_API_KEY`가 있을 때만 합니다. 없으면 줄거리만으로 영화 문서를 만듭니다.
+  이미 만든 카탈로그에 보강만 하려면 `s01_collect_meta --kmdb-only`를 씁니다.
 
 ### 검색 API
 
@@ -267,6 +275,8 @@ SPEC.md     구현 명세
 서비스에는 장면 썸네일만 제공합니다.
 
 This product uses the TMDB API but is not endorsed or certified by TMDB.
+
+영화 키워드와 한국어 줄거리 일부는 한국영상자료원 [KMDb](https://www.kmdb.or.kr/) Open API에서 가져옵니다.
 
 코드는 [MIT 라이선스](LICENSE)를 따릅니다. TMDB에서 가져온 데이터(영화 정보, 이미지, 이를 바탕으로 만든
 캡션과 합성 질의)에는 MIT가 적용되지 않으며 [TMDB 이용약관](https://www.themoviedb.org/api-terms-of-use)을 따릅니다.

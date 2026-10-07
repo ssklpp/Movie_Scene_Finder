@@ -16,6 +16,8 @@ Qdrant 주소·컬렉션·임베딩 차원·토크나이저를 바꾼다(그 프
 - tokenizer: kiwi_dict(운영: Kiwi + 사용자 사전) / kiwi(사전 없음) / char2(어절별 문자 2-gram).
   문서와 질의 모두 같은 토크나이저를 쓰고, 줄거리(movies) 컬렉션에도 적용한다.
 - embed_dim: text-embedding-3-small의 `dimensions` 값. 장면·줄거리 모두 적용한다.
+- plot_doc: 줄거리(movies) 컬렉션 문서. plot(이전 운영: TMDB 줄거리만) / plot_kw(줄거리 + KMDb
+  키워드, KW 실험 결과로 현재 운영 s07과 같음). plot_kw이면 컬렉션 이름 끝에 `_kw`가 붙는다.
 """
 
 import argparse
@@ -44,7 +46,7 @@ from app.search import qdrant, sparse
 from app.search.qdrant import PLOT_DENSE, PLOT_SPARSE, SCENE_DENSE, SCENE_SPARSE
 from pipeline.s04_caption import backend_config
 from pipeline.s06_build_docs import build_search_text
-from pipeline.s07_embed import EMBED_BATCH, MOVIES_PARQUET, SCENES_PARQUET
+from pipeline.s07_embed import EMBED_BATCH, MOVIES_PARQUET, SCENES_PARQUET, movie_doc
 from pipeline.s08_upload import create_collection, movie_payload, point_id, upsert_points
 
 logger = logging.getLogger(__name__)
@@ -55,16 +57,19 @@ WORD = re.compile(r"\w+")
 
 DocLang = Literal["ko", "en", "both"]
 TokenizerKind = Literal["kiwi_dict", "kiwi", "char2"]
+PlotDoc = Literal["plot", "plot_kw"]
 
 
 class IndexVariant(BaseModel):
     doc_lang: DocLang = "ko"
     tokenizer: TokenizerKind = "kiwi_dict"
     embed_dim: int = 1536
+    plot_doc: PlotDoc = "plot"
 
     @property
     def name(self) -> str:
-        return f"exp_{self.doc_lang}_{self.tokenizer}_{self.embed_dim}"
+        suffix = "_kw" if self.plot_doc == "plot_kw" else ""
+        return f"exp_{self.doc_lang}_{self.tokenizer}_{self.embed_dim}{suffix}"
 
     @property
     def scenes_collection(self) -> str:
@@ -113,7 +118,14 @@ def scene_caption(lang: DocLang, caption_ko: str, caption_en: str | None) -> str
     return en if lang == "en" else f"{caption_ko}\n{en}"
 
 
-def load_docs(lang: DocLang) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[int, Movie]]:
+def plot_text(plot_doc: PlotDoc, plot_ko: str | None, keywords_ko: list[str] | None) -> str:
+    """줄거리 문서. plot_kw이면 운영 s07과 같은 문서(줄거리 + 키워드)."""
+    return movie_doc(plot_ko, keywords_ko if plot_doc == "plot_kw" else None)
+
+
+def load_docs(
+    lang: DocLang, plot_doc: PlotDoc = "plot"
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[int, Movie]]:
     """(장면 문서, 줄거리 문서, 영화). 장면은 s06과 같은 조건(현재 캡션 버전)만 쓴다."""
     model_version = backend_config(get_settings()).model_version
     with SessionLocal() as session:
@@ -133,7 +145,11 @@ def load_docs(lang: DocLang) -> tuple[list[dict[str, Any]], list[dict[str, Any]]
         for s in scenes
         if s.caption_ko and s.tags is not None and s.model_version == model_version
     ]
-    plot_docs = [{"movie": m, "text": m.plot_ko} for m in movies.values() if m.plot_ko]
+    plot_docs = [
+        {"movie": m, "text": text}
+        for m in movies.values()
+        if (text := plot_text(plot_doc, m.plot_ko, m.keywords_ko))
+    ]
     return scene_docs, plot_docs, movies
 
 
@@ -208,7 +224,7 @@ def build(variant: IndexVariant, force: bool = False) -> None:
     settings = get_settings()
     settings.embed_dim = variant.embed_dim
     tokenize = tokenizer_for(variant.tokenizer)
-    scene_docs, plot_docs, movies = load_docs(variant.doc_lang)
+    scene_docs, plot_docs, movies = load_docs(variant.doc_lang, variant.plot_doc)
     cache = load_cache()
     scene_dense = embed_texts([d["text"] for d in scene_docs], variant.embed_dim, cache)
     plot_dense = embed_texts([d["text"] for d in plot_docs], variant.embed_dim, cache)
@@ -275,12 +291,18 @@ def main() -> None:
     b.add_argument("--doc-lang", choices=["ko", "en", "both"], default="ko")
     b.add_argument("--tokenizer", choices=["kiwi_dict", "kiwi", "char2"], default="kiwi_dict")
     b.add_argument("--dim", type=int, default=1536)
+    b.add_argument("--plot-doc", choices=["plot", "plot_kw"], default="plot")
     b.add_argument("--force", action="store_true", help="이미 있어도 다시 만든다")
     args = parser.parse_args()
     setup_logging()
     for noisy in ("httpx", "httpx2", "app.core.llm"):
         logging.getLogger(noisy).setLevel(logging.WARNING)
-    variant = IndexVariant(doc_lang=args.doc_lang, tokenizer=args.tokenizer, embed_dim=args.dim)
+    variant = IndexVariant(
+        doc_lang=args.doc_lang,
+        tokenizer=args.tokenizer,
+        embed_dim=args.dim,
+        plot_doc=args.plot_doc,
+    )
     build(variant, force=args.force)
 
 

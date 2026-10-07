@@ -6,7 +6,10 @@
 - sparse: `app.search.sparse`(backend 질의와 같은 함수)의 BM25 문서 가중치. avgdl은 컬렉션별로
   계산해 `pipeline/data/bm25_stats.json`에 쓴다. 가벼우므로 매번 다시 계산한다.
 
-입력: pipeline/data/search_docs.jsonl(s06), movies.plot_ko
+- 영화 문서 = 줄거리(plot_ko) + 다음 줄에 KMDb 키워드(keywords_ko, 쉼표 구분). 키워드는
+  KW 실험(human 검색만 R@5 0.16 → 0.20) 결과로 넣었다.
+
+입력: pipeline/data/search_docs.jsonl(s06), movies.plot_ko·keywords_ko
 출력: pipeline/data/vectors/scenes.parquet, movies.parquet
 """
 
@@ -40,6 +43,12 @@ EMBED_BATCH = 100
 
 def text_hash(text: str, model: str, dim: int) -> str:
     return hashlib.sha1(f"{model}|{dim}|{text}".encode()).hexdigest()
+
+
+def movie_doc(plot_ko: str | None, keywords_ko: Sequence[str] | None) -> str:
+    """영화 검색 문서. 줄거리 다음 줄에 키워드를 쉼표로 잇는다. 둘 다 없으면 빈 문자열."""
+    parts = [plot_ko or "", ", ".join(keywords_ko or [])]
+    return "\n".join(p for p in parts if p)
 
 
 def load_dense_cache(path: Path) -> dict[str, list[float]]:
@@ -109,13 +118,17 @@ def main() -> None:
     docs = [d for d in docs if d["movie_id"] in movie_ids]
     with SessionLocal() as session:
         stmt = (
-            select(Movie.id, Movie.tmdb_id, Movie.plot_ko)
-            .where(Movie.id.in_(movie_ids), Movie.plot_ko.is_not(None))
+            select(Movie.id, Movie.tmdb_id, Movie.plot_ko, Movie.keywords_ko)
+            .where(Movie.id.in_(movie_ids))
             .order_by(Movie.id)
         )
-        movies = [(mid, tid, plot) for mid, tid, plot in session.execute(stmt).all() if plot]
+        movies = [
+            (mid, tid, text)
+            for mid, tid, plot, kw in session.execute(stmt).all()
+            if (text := movie_doc(plot, kw))
+        ]
     logger.info(
-        "s07: %d scene docs, %d movie plots (model=%s dim=%d)", len(docs), len(movies), model, dim
+        "s07: %d scene docs, %d movie docs (model=%s dim=%d)", len(docs), len(movies), model, dim
     )
 
     kiwi = sparse.get_kiwi()

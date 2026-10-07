@@ -125,6 +125,7 @@ CAPTION_MODEL_VERSION=qwen3vl4b-awq4-v1
 
 # Data sources
 TMDB_READ_TOKEN=
+# 선택: s01이 KMDb 줄거리·키워드로 보강한다(없으면 건너뜀)
 KMDB_API_KEY=
 
 # Storage
@@ -243,7 +244,7 @@ class SceneCaption(BaseModel):
 | s04_caption | scenes | `CAPTION_BACKEND`에 따라 로컬 vLLM 또는 OpenAI 실시간 API로 `SceneCaption` 생성(동시 3개, `max_completion_tokens=1200`, TPM 한도 때문). 두 백엔드 모두 OpenAI 호환 클라이언트 사용. 프롬프트는 `search/caption.py`(이미지 질의와 공유) | `scenes.caption_*`, `tags` |
 | s05_validate | scenes | Pydantic 검증 실패 재시도(최대 2회), 실패 목록 출력, 무작위 50개 검수용 CSV 생성 | `reports/caption_review.csv` |
 | s06_build_docs | scenes, movies | 검색 문서 = caption_ko + caption_en + setting + objects + 장르·연대 (caption_en은 E3 결과로 추가. 제목 제외, 제목 로고가 있을 수 있어 text_in_frame도 제외) | `pipeline/data/search_docs.jsonl` |
-| s07_embed | search_text, plot_ko | dense: OpenAI 임베딩(배치 100) / sparse: §7.2 BM25 가중치 | 벡터 파일(parquet) |
+| s07_embed | search_text, 영화 문서 = plot_ko + KMDb keywords_ko(KW 실험 결과) | dense: OpenAI 임베딩(배치 100) / sparse: §7.2 BM25 가중치 | 벡터 파일(parquet) |
 | s08_upload | 벡터, payload | 새 컬렉션 `scenes_v{n}` 생성 → upsert(256개 배치) → alias `scenes` 교체, 썸네일(긴 변 512px JPEG) R2 `thumbs/{scene_id}.jpg` 업로드 | Qdrant, R2, `scenes.r2_key` |
 
 `make index` = s01~s08 순차 실행(s03 다음에 build_user_dict). `QDRANT_URL`만 바꾸면 로컬/클라우드 어디든 적재된다.

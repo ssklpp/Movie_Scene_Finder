@@ -1,0 +1,5 @@
+# KMDb 키워드 실험 에이전트 버전(재질문 최대 2회, 시뮬레이터).
+experiment: KW
+name: plot_kw_agent
+agent: true
+index: {doc_lang: both, plot_doc: plot_kw}
