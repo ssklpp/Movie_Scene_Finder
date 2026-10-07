@@ -53,7 +53,7 @@ class Settings(BaseSettings):
     confidence_threshold: float = 0.7
     max_clarify_turns: int = 2
     scene_topk: int = 50
-    movie_topk: int = 10
+    movie_topk: int = 20
     w_second_scene: float = 0.3
     w_plot: float = 0.5
     soft_filter_boost: float = 1.1

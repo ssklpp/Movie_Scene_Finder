@@ -1,0 +1,5 @@
+# 검증 후보 수 비교: 기준(MOVIE_TOPK 10). 에이전트 + 재질문 시뮬레이터.
+experiment: TOPK
+name: topk10_agent
+agent: true
+movie_topk: 10

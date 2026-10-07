@@ -145,7 +145,7 @@ R2_PUBLIC_URL=
 CONFIDENCE_THRESHOLD=0.7
 MAX_CLARIFY_TURNS=2
 SCENE_TOPK=50
-MOVIE_TOPK=10
+MOVIE_TOPK=20
 W_SECOND_SCENE=0.3
 W_PLOT=0.5
 SOFT_FILTER_BOOST=1.1
@@ -286,9 +286,10 @@ s1, s2 = 해당 영화 장면 RRF 점수 1·2위(없으면 0), p_m = 줄거리 �
 
 ### 7.5 검증과 확신도
 
-- `gpt-6-luna`에 사용자 묘사 + 후보 10편의 제목·연도·근거 캡션을 주고 영화별 `{movie_id, score: 0~1, reason}`을 structured output으로 받는다.
+- `gpt-6-luna`에 사용자 묘사 + 후보 `MOVIE_TOPK`(20)편의 제목·연도·근거 캡션을 주고 영화별 `{movie_id, score: 0~1, reason}`을 structured output으로 받는다.
   - `evidence_scene_ids`는 받지 않는다. 근거 장면은 검색 결과에서 가져오고, 이 필드가 출력 토큰의 약 30%를 차지해 응답이 느려졌다. `reason`은 점수 상위 5편만 50자 이내로 쓴다(지연시간은 출력 토큰 수에 비례).
   - `reasoning_effort="none"`으로 부른다(`VERIFY_REASONING_EFFORT`). dev E6에서 low와 정확도가 같고 요청 p95가 약 1.9초 짧았다. 질의 재작성(§7.1)도 같은 이유로 none이다(`REWRITE_REASONING_EFFORT`, low이면 가끔 추론이 500토큰을 넘어 요청이 8초 이상 걸렸다).
+  - 후보는 처음 10편이었으나 20편으로 늘렸다. 재작성한 질의의 정답 포함률이 dev에서 10편 0.84 → 20편 0.91이고, 에이전트 R@1이 0.88 → 0.93, 요청 p95는 같았다(TOPK 실험).
   - 제목·연도를 주어 LLM의 영화 지식을 쓰되, "제목 글자로 점수를 올리지 말 것", "흔한 장면이면 0.5 이하"를 프롬프트에 넣는다.
 - 검증 점수로 재정렬한다. v1, v2 = 1·2위 점수.
 - `confidence = 0.6 * v1 + 0.4 * min(1, (v1 - v2) / 0.3)`

@@ -1,0 +1,5 @@
+# 검증 후보 수 비교: MOVIE_TOPK 20(후보 재현율 분석에서 dev R@10 0.84 → R@20 0.91).
+experiment: TOPK
+name: topk20_agent
+agent: true
+movie_topk: 20

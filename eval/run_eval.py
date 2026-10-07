@@ -14,7 +14,7 @@
   돌리고, 재질문에는 시뮬레이터(eval/simulator.py)가 정답 영화의 속성으로 답한다. sessions에는
   기록하지 않는다. 설정의 max_clarify_turns·confidence_threshold로 .env 값을 덮어쓴다(E6).
 - 정답은 answer_tmdb_id로 맞춘다(movies.id는 DB를 새로 만들면 바뀔 수 있다).
-- 지표: 상위 MOVIE_TOPK 안의 정답 순위로 Recall@1·@5·MRR(10위 밖은 0), 지연시간 p95,
+- 지표: 상위 목록 안의 정답 순위로 Recall@1·@5·MRR(목록 밖은 0), 지연시간 p95,
   질의당 비용. 에이전트 모드는 평균 재질문 횟수(avg_clarify)와 clarify_success(재질문을 한 질의 중
   최종 1위가 정답인 비율, SPEC에 정의가 없어 이렇게 정함)를 더하고, p95는 요청 1회(사용자가 응답을
   기다리는 단위) 기준이다. 질의를 동시에 돌리므로(--workers) 지연시간은 다소 높게 잡힌다.
@@ -69,6 +69,7 @@ DATASET_FILES = {
     "human": "human_v1.jsonl",
     "image": "image_v1.jsonl",
 }
+SEARCH_EVAL_TOPK = 10  # --no-agent MRR을 이전 실행과 같은 기준(10위 밖은 0)으로 잰다
 MAX_AGENT_REQUESTS = 6  # 재질문이 끝나지 않는 경우를 막는 안전장치
 
 
@@ -219,7 +220,7 @@ def run_query(ex: Example, cfg: EvalConfig, tmdb_by_movie: dict[int, int]) -> Qu
         w_second_scene=cfg.w_second_scene,
         w_plot=cfg.w_plot,
         soft_filter_boost=cfg.soft_filter_boost,
-        movie_topk=cfg.movie_topk,
+        movie_topk=cfg.movie_topk or SEARCH_EVAL_TOPK,
     )
     latency_ms = round((time.perf_counter() - started) * 1000)
     top = [tmdb_by_movie[m.movie_id] for m in ranked]
