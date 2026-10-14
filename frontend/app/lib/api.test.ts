@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { parseBlocks } from "./api";
+import { parseBlocks, post } from "./api";
 
 describe("parseBlocks", () => {
   it("splits SSE blocks and keeps an unfinished block for the next chunk", () => {
@@ -23,5 +23,39 @@ describe("parseBlocks", () => {
   it("ignores comments and blocks without event or data", () => {
     const { events } = parseBlocks(": ping\n\nevent: status\n\ndata: {}\n\n");
     expect(events).toEqual([]);
+  });
+});
+
+describe("post", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  it("retries while the platform proxy answers 502 (server waking up)", async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response("", { status: 502 }))
+      .mockResolvedValueOnce(new Response("", { status: 503 }))
+      .mockResolvedValueOnce(new Response("ok", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const pending = post("/search", { body: "x" });
+    await vi.runAllTimersAsync();
+    const res = await pending;
+
+    expect(res.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("does not retry app errors such as rate limit", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response("", { status: 429 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const res = await post("/search", { body: "x" });
+
+    expect(res.status).toBe(429);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
