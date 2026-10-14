@@ -94,11 +94,29 @@ async function* stream(res: Response): AsyncGenerator<SearchEvent> {
   }
 }
 
-async function post(path: string, init: RequestInit): Promise<Response> {
-  try {
-    return await fetch(`${API_URL}${path}`, { method: "POST", ...init });
-  } catch {
-    throw new ApiError(0, errorMessage(0, ""));
+// 서버가 쉬고 있다가(Railway Serverless) 깨어나는 동안 플랫폼 프록시는 502~504를 돌려준다.
+// 이 응답은 앱까지 가지 않은 요청이라 다시 보내도 검색이 두 번 실행되지 않는다.
+const WAKING_STATUSES = new Set([502, 503, 504]);
+const WAKE_RETRY_MS = 3000;
+const WAKE_MAX_TRIES = 15; // 약 45초: 컨테이너 시작 + 마이그레이션 + Kiwi 로딩
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** 페이지를 열 때 서버를 미리 깨운다. 사용자가 질의를 쓰는 동안 시작이 끝난다. 실패는 무시한다. */
+export function wakeServer(): void {
+  fetch(`${API_URL}/health`).catch(() => {});
+}
+
+export async function post(path: string, init: RequestInit): Promise<Response> {
+  for (let attempt = 1; ; attempt++) {
+    let res: Response;
+    try {
+      res = await fetch(`${API_URL}${path}`, { method: "POST", ...init });
+    } catch {
+      throw new ApiError(0, errorMessage(0, ""));
+    }
+    if (!WAKING_STATUSES.has(res.status) || attempt >= WAKE_MAX_TRIES) return res;
+    await sleep(WAKE_RETRY_MS);
   }
 }
 

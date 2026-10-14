@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
   ApiError,
@@ -10,6 +10,7 @@ import {
   type Step,
   answer,
   search,
+  wakeServer,
 } from "../lib/api";
 import Progress from "./Progress";
 import QuestionCard from "./QuestionCard";
@@ -37,6 +38,11 @@ export default function SceneSearch() {
   const [submittedText, setSubmittedText] = useState("");
 
   const busy = phase === "running";
+
+  // 서버가 쉬고 있으면 질의를 쓰는 동안 깨워 둔다(첫 검색의 대기 시간을 줄인다).
+  useEffect(() => {
+    wakeServer();
+  }, []);
 
   async function consume(events: AsyncGenerator<SearchEvent>) {
     setPhase("running");
