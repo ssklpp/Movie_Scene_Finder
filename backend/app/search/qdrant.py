@@ -2,6 +2,7 @@
 
 from functools import lru_cache
 
+import httpx
 from qdrant_client import QdrantClient
 
 from app.core.config import get_settings
@@ -16,9 +17,18 @@ PLOT_SPARSE = "plot_sparse_ko"
 
 @lru_cache
 def get_qdrant() -> QdrantClient:
+    """요청마다 연결을 새로 맺고 닫는다(keep-alive 없음).
+
+    Qdrant Cloud는 놀고 있는 연결에 약 3분마다 패킷을 보내고, 우리 쪽 응답(ACK)이 나가는
+    트래픽으로 잡혀 Railway Serverless가 서버를 재우지 못했다. 연결을 남겨 두지 않으면 요청이
+    없을 때 나가는 패킷이 없다. 대신 Qdrant 호출마다 TLS 연결 시간(같은 리전, 수십 ms)이 더해진다.
+    """
     s = get_settings()
     return QdrantClient(
-        url=s.qdrant_url, api_key=s.qdrant_api_key or None, timeout=int(s.http_timeout_s)
+        url=s.qdrant_url,
+        api_key=s.qdrant_api_key or None,
+        timeout=int(s.http_timeout_s),
+        limits=httpx.Limits(max_keepalive_connections=0),
     )
 
 
