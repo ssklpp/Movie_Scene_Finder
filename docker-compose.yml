@@ -1,3 +1,18 @@
+# 기본(make up): 개발용 qdrant·postgres만 띄운다.
+# --profile demo(make demo): seed(사용자 키로 영화 몇 편 색인) → backend → frontend까지 띄운다.
+
+# demo 컨테이너는 .env를 읽되 저장소·검색 대상은 항상 이 compose의 컨테이너로 고정한다.
+# .env의 QDRANT_URL이 Qdrant Cloud(운영)이거나 R2 키가 있어도 운영 데이터를 건드리지 않는다.
+x-demo-env: &demo-env
+  DATABASE_URL: postgresql+psycopg://app:app@postgres:5432/msf
+  QDRANT_URL: http://qdrant:6333
+  QDRANT_API_KEY: ""
+  R2_ACCOUNT_ID: ""
+  R2_ACCESS_KEY_ID: ""
+  R2_SECRET_ACCESS_KEY: ""
+  R2_PUBLIC_URL: ""
+  LANGSMITH_TRACING: "false"
+
 services:
   qdrant:
     image: qdrant/qdrant:latest
@@ -22,6 +37,57 @@ services:
       timeout: 3s
       retries: 30
 
+  seed:
+    profiles: [demo]
+    build:
+      context: .
+      dockerfile: pipeline/Dockerfile
+    env_file: .env
+    environment:
+      <<: *demo-env
+      SEED_LIMIT: ${SEED_LIMIT:-20}
+    command: ["sh", "-c", "python -m pipeline.seed --limit $${SEED_LIMIT}"]
+    volumes:
+      - seed_data:/app/pipeline/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+
+  backend:
+    profiles: [demo]
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    env_file: .env
+    environment:
+      <<: *demo-env
+      CORS_ORIGINS: '["http://localhost:3000"]'
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 3s
+      timeout: 3s
+      retries: 40
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+
+  frontend:
+    profiles: [demo]
+    build:
+      context: frontend
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+
 volumes:
   qdrant_data:
   pg_data:
+  seed_data:

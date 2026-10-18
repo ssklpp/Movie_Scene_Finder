@@ -1,0 +1,16 @@
+.git
+.github
+.venv
+**/__pycache__
+**/.mypy_cache
+**/.ruff_cache
+**/.pytest_cache
+.env
+frontend
+eval
+reports
+scripts
+backend/data
+backend/tests
+pipeline/data
+pipeline/tests
