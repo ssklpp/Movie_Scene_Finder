@@ -163,7 +163,7 @@ LLM이 그 영화를 알아도 답할 수 없습니다.
 - **LLM·VLM**: `gpt-6-luna` (캡션, 질의 재작성, 검증), 합성 질의는 `gpt-6.1-sol`
 - **Frontend**: Next.js 16, TypeScript, Tailwind
 - **배포**: Railway(backend, PostgreSQL), Vercel(frontend), Qdrant Cloud, Cloudflare R2(썸네일)
-- **관측**: LangSmith(요청별 노드·LLM 호출 추적, 사용자 사진은 가려서 기록)
+- **관측**: LangSmith(요청별 노드·LLM 호출 추적, 사용자 사진은 가려서 기록, 결과 화면의 정답/오답 피드백을 그 결과를 낸 트레이스에 `user_correct`로 연결)
 - **Tooling**: uv, pnpm, ruff, mypy `--strict`, pytest, Vitest, GitHub Actions
 
 ## 시작하기

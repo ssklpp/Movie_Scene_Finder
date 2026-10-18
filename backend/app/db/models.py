@@ -75,6 +75,8 @@ class Session(Base):
     confidence: Mapped[float | None] = mapped_column(REAL)
     latency_ms: Mapped[int | None]
     cost_usd: Mapped[Decimal | None] = mapped_column(Numeric(10, 6))
+    # 결과를 낸 요청의 LangSmith 루트 run ID(추적이 꺼져 있으면 NULL). 피드백을 이 run에 붙인다
+    trace_run_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
 
 
 class Feedback(Base):

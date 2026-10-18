@@ -1,4 +1,6 @@
+import uuid
 from collections.abc import Iterator
+from typing import Any
 
 import langsmith
 import pytest
@@ -13,6 +15,26 @@ def tracing_off() -> Iterator[None]:
     yield
     langsmith.configure(client=None, enabled=False)
     tracing._enabled = False
+    tracing._client = None
+    tracing._project_id = None
+
+
+class FakeLangSmith:
+    PROJECT_ID = uuid.UUID(int=1)
+
+    def __init__(self, fail: bool = False) -> None:
+        self.fail = fail
+        self.calls: list[tuple[Any, dict[str, Any]]] = []
+        self.project_lookups = 0
+
+    def read_project(self, *, project_name: str) -> Any:
+        self.project_lookups += 1
+        return type("Project", (), {"id": self.PROJECT_ID})()
+
+    def create_feedback(self, run_id: Any, **kwargs: Any) -> None:
+        if self.fail:
+            raise ConnectionError("langsmith down")
+        self.calls.append((run_id, kwargs))
 
 
 def test_redact_images_replaces_data_urls_only() -> None:
@@ -49,3 +71,33 @@ def test_tracing_on_wraps_openai_client(monkeypatch: pytest.MonkeyPatch) -> None
     assert tracing.tracing_enabled()
     wrapped = tracing.traced_client(OpenAI(api_key="test"))
     assert type(wrapped.chat.completions.create) is not type(create)
+
+
+def test_send_feedback_scores_run(monkeypatch: pytest.MonkeyPatch) -> None:
+    fake = FakeLangSmith()
+    monkeypatch.setattr(tracing, "_enabled", True)
+    monkeypatch.setattr(tracing, "_client", fake)
+    run_id = uuid.uuid4()
+    tracing.send_feedback(run_id, False, 7)
+    tracing.send_feedback(run_id, True, 8)
+    assert [(r, k["key"], k["score"]) for r, k in fake.calls] == [
+        (run_id, "user_correct", 0),
+        (run_id, "user_correct", 1),
+    ]
+    assert fake.calls[0][1]["comment"] == "movie_id=7"
+    assert fake.calls[0][1]["trace_id"] == run_id
+    assert all(k["session_id"] == FakeLangSmith.PROJECT_ID for _, k in fake.calls)
+    assert fake.project_lookups == 1  # 프로젝트 ID는 한 번만 조회한다
+
+
+def test_send_feedback_skipped_when_tracing_off(monkeypatch: pytest.MonkeyPatch) -> None:
+    fake = FakeLangSmith()
+    monkeypatch.setattr(tracing, "_client", fake)  # 꺼져 있으면 클라이언트가 있어도 보내지 않는다
+    tracing.send_feedback(uuid.uuid4(), True, 1)
+    assert fake.calls == []
+
+
+def test_send_feedback_failure_is_swallowed(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(tracing, "_enabled", True)
+    monkeypatch.setattr(tracing, "_client", FakeLangSmith(fail=True))
+    tracing.send_feedback(uuid.uuid4(), True, 1)  # 예외가 밖으로 나오지 않는다

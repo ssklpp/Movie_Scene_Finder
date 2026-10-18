@@ -29,12 +29,16 @@ class MemoryStore:
     def __init__(self) -> None:
         self.created: list[str] = []
         self.finished: dict[str, SearchState] = {}
+        self.trace_run_ids: dict[str, uuid.UUID | None] = {}
 
     def create(self, session_id: str, query_text: str | None, image_key: str | None) -> None:
         self.created.append(session_id)
 
-    def finish(self, session_id: str, state: SearchState) -> None:
+    def finish(
+        self, session_id: str, state: SearchState, trace_run_id: uuid.UUID | None = None
+    ) -> None:
         self.finished[session_id] = state
+        self.trace_run_ids[session_id] = trace_run_id
 
     def exists(self, session_id: str) -> bool:
         return session_id in self.created
@@ -106,6 +110,43 @@ def test_question_then_answer_resumes(client: Callable[..., Any]) -> None:
     assert [i["movie_id"] for i in events[-1][1]["items"]] == [1]
     assert fakes.retrieve_calls[-1][1] == {"decade": "2010s"}
     assert store.finished[session_id]["clarify_turns"] == 1
+
+
+def capture_run_ids(runtime: AgentRuntime) -> list[Any]:
+    """그래프 실행마다 config에 넘긴 루트 run ID를 모은다."""
+    run_ids: list[Any] = []
+    stream = runtime.graph.stream
+
+    def recording(graph_input: Any, config: Any, **kwargs: Any) -> Any:
+        run_ids.append(config["run_id"])
+        return stream(graph_input, config, **kwargs)
+
+    setattr(runtime.graph, "stream", recording)  # noqa: B010
+    return run_ids
+
+
+def test_trace_run_id_is_from_request_that_produced_result(
+    client: Callable[..., Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("app.agent.runtime.tracing_enabled", lambda: True)
+    tc, _, store = client(lambda n: {1: 0.6, 2: 0.55} if n == 1 else {1: 0.9})
+    run_ids = capture_run_ids(app.state.runtime)
+    events = parse_sse(tc.post("/search", data={"text": "물 차는 집"}).text)
+    sid = events[0][1]["session_id"]
+    parse_sse(tc.post(f"/search/{sid}/answer", json={"value": "2010s"}).text)
+    assert len(run_ids) == 2 and run_ids[0] != run_ids[1]
+    # 재질문 전 search가 아니라 결과를 낸 answer 요청의 트레이스
+    assert store.trace_run_ids[sid] == run_ids[1]
+
+
+def test_trace_run_id_empty_when_tracing_off(
+    client: Callable[..., Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # main.py가 import 때 setup_tracing()을 부르므로 .env에 따라 켜져 있을 수 있다
+    monkeypatch.setattr("app.agent.runtime.tracing_enabled", lambda: False)
+    tc, _, store = client(lambda n: {1: 0.95, 2: 0.2})
+    sid = parse_sse(tc.post("/search", data={"text": "반지하"}).text)[0][1]["session_id"]
+    assert store.trace_run_ids[sid] is None
 
 
 def test_answer_errors(client: Callable[..., Any]) -> None:
@@ -224,6 +265,35 @@ def test_session_recorded_and_feedback(client: Callable[..., Any], db_movie: int
     bad_movie = {"session_id": sid, "movie_id": -1, "is_correct": False}
     assert tc.post("/feedback", json=bad_movie).status_code == 404
     with SessionLocal.begin() as db:
+        db.execute(delete(Feedback).where(Feedback.session_id == uuid.UUID(sid)))
+        db.execute(delete(SessionRow).where(SessionRow.id == uuid.UUID(sid)))
+
+
+def test_feedback_sent_to_trace_and_failure_keeps_204(
+    client: Callable[..., Any], db_movie: int, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.core import tracing
+    from tests.test_tracing import FakeLangSmith
+
+    monkeypatch.setattr("app.agent.runtime.tracing_enabled", lambda: True)
+    tc, _, _ = client(lambda n: {1: 0.95, 2: 0.2}, store=SqlSessionStore())
+    sid = parse_sse(tc.post("/search", data={"text": "반지하"}).text)[0][1]["session_id"]
+    with SessionLocal() as db:
+        row = db.get(SessionRow, uuid.UUID(sid))
+        assert row is not None and row.trace_run_id is not None
+        run_id = row.trace_run_id
+
+    fake = FakeLangSmith()
+    monkeypatch.setattr(tracing, "_enabled", True)
+    monkeypatch.setattr(tracing, "_client", fake)
+    body = {"session_id": sid, "movie_id": db_movie, "is_correct": False}
+    assert tc.post("/feedback", json=body).status_code == 204
+    assert [(r, k["score"]) for r, k in fake.calls] == [(run_id, 0)]
+
+    monkeypatch.setattr(tracing, "_client", FakeLangSmith(fail=True))
+    assert tc.post("/feedback", json=body).status_code == 204  # LangSmith 장애와 무관
+    with SessionLocal.begin() as db:
+        assert db.query(Feedback).filter(Feedback.session_id == uuid.UUID(sid)).count() == 2
         db.execute(delete(Feedback).where(Feedback.session_id == uuid.UUID(sid)))
         db.execute(delete(SessionRow).where(SessionRow.id == uuid.UUID(sid)))
 
