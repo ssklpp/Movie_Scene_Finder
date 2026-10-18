@@ -29,6 +29,7 @@ make test          # pytest
 make dev           # backend(:8000) + frontend(:3000)
 make index LIMIT=20  # 파이프라인 s01~s08 순차 실행
 make eval
+make demo          # Docker만으로 seed(내 키로 20편 색인) → backend → frontend (SEED_LIMIT)
 
 uv run pytest backend/tests/test_xxx.py::test_name   # 단일 테스트
 uv run ruff check . && uv run ruff format .
@@ -100,6 +101,7 @@ Python은 항상 `uv run`으로 실행한다(Python 3.12로 고정하고 시스�
 - s07 출력은 `pipeline/data/vectors/{scenes,movies}.parquet`. dense는 "모델|차원|문서" 해시로 캐시해 바뀐 문서만 다시 임베딩한다. 전체 임베딩 비용 약 $0.012. 줄거리가 없는 영화 1편은 `movies`에서 빠진다(p_m = 0).
 - s08: 컬렉션·벡터 이름(`scenes_v{n}`, `movies`, `dense`, `sparse_ko`, `plot_dense`, `plot_sparse_ko`)과 연대 키(`"2010s"`)는 `search/qdrant.py`에 있고 검색도 이것을 쓴다. 포인트 ID는 scene_id의 UUID5이며 scene_id는 payload에 있다. 입력 parquet가 같으면 건너뛰므로 다시 적재하려면 `--force`. 시험용으로 만든 `scenes_v1`(41개)은 다음 적재 때 정리된다.
 - `make index`는 s03 다음에 `build_user_dict`를 돌린다(s07 sparse 토큰화가 사전을 쓴다).
+- **원클릭 데모(`make demo`, 2026-10-18, `docs/roadmap.md` 1번)**: compose 프로필 `demo`의 `seed`(`pipeline/Dockerfile`, `pipeline/seed.py`) → `backend` → `frontend`(`frontend/Dockerfile`). TMDB 약관(2차 저작물·데이터셋 제공 금지) 때문에 미리 만든 색인을 배포하지 않고, seed가 사용자의 TMDB·OpenAI 키로 s01~s08을 `--limit SEED_LIMIT`(기본 20)으로 돌린다(약 5분 30초, $0.08). alias `scenes`가 있으면 건너뛰고, `build_user_dict`는 돌리지 않는다(backend 이미지의 저장소 사전과 토큰화를 맞춤). compose의 `x-demo-env`가 `DATABASE_URL`·`QDRANT_URL`을 compose 안으로 고정하고 R2 키·`LANGSMITH_TRACING`을 끈다. **프로젝트 `.env`가 운영 Qdrant Cloud·R2를 가리키므로 이 덮어쓰기를 빼면 안 된다.** demo는 `make up`과 같은 compose 프로젝트·볼륨을 쓰므로, 로컬에 전체 색인이 있으면 seed는 건너뛰고 그 300편으로 뜬다. 빈 상태를 시험하려면 `docker compose -p <다른 이름> --profile demo up`(끝나면 `down -v --rmi local`). frontend standalone 출력은 `NEXT_OUTPUT=standalone`일 때만 켠다(Vercel 빌드 영향 없음). 새 worktree에서 `tsc`가 `LayoutProps`를 못 찾으면 `pnpm exec next typegen`을 먼저 돌린다.
 - synthetic 질의(`eval/datasets/synthetic_v1.jsonl`, `uv run python -m eval.make_synthetic`): 영화마다 장면 1개 → 300개(dev 200 / test 100, seed 0), gpt-6.1-sol, 비용 $0.46. 원문 Kiwi 토큰 겹침 ≤ 50%(중간값 19.5%)를 코드로 확인한다. 일부러 틀린 세부의 46%가 색이다. 캡션을 바꿔 쓴 질의라 human보다 쉬우므로 최종 판단은 human 기준으로 한다.
 - 평가: `uv run python -m eval.run_eval --config eval/configs/E1_hybrid.yaml --split dev --no-agent` → `eval_runs` + `reports/eval_*.md`(1위가 아닌 질의 목록)·`.jsonl`(질의별 결과). 비교표는 `uv run python -m eval.report --experiment E1 --split dev`. 커밋 해시는 코드 변경이 남아 있으면 `-dirty`가 붙는다. `--limit`을 주면 `eval_runs`에 기록하지 않는다. 에이전트 평가는 Phase 4에서 추가한다.
 - **E1 결과(dev, synthetic 200, `--no-agent`, 2026-10-04)**: dense R@1 0.100 / R@5 0.235 / MRR 0.156, sparse 0.210 / 0.375 / 0.293, **hybrid 0.205 / 0.410 / 0.286**. p95 < 0.2초. hybrid가 dense 대비 약 2배이고 sparse와는 비슷하다. dense가 약한 이유는 파이프라인 문제가 아니다(저장 벡터·Qdrant·전수 계산 순위 일치를 확인했다). 많이 바꿔 쓴 구어체 질의에서 text-embedding-3-small의 원문 장면 유사도가 비슷한 다른 장면보다 낮다. 개선 후보: Phase 4 질의 재작성(rewrite), dense 모델, RRF k(Qdrant 기본은 1/(1+순위)), 홍보 이미지 제외. 이 실행은 평가 코드 커밋 전이라 `eval_runs`의 커밋 값(`9e4d7c4`)에 평가 코드가 없다.

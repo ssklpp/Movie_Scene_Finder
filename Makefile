@@ -1,4 +1,4 @@
-.PHONY: up down migrate test dev index eval lint
+.PHONY: up down migrate test dev index eval lint demo demo-down
 
 LIMIT ?=
 LIMIT_ARG := $(if $(LIMIT),--limit $(LIMIT),)
@@ -10,6 +10,14 @@ up:
 
 down:
 	docker compose down
+
+# .env의 OpenAI·TMDB 키로 영화 SEED_LIMIT편(기본 20)을 색인하고 backend(:8000)·frontend(:3000)를 띄운다.
+# 처음 한 번은 수 분 걸리고, 이미 색인돼 있으면 seed는 바로 끝난다.
+demo:
+	docker compose --profile demo up -d --build --wait
+
+demo-down:
+	docker compose --profile demo down
 
 migrate:
 	cd backend && uv run alembic upgrade head

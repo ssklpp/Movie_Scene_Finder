@@ -170,6 +170,28 @@ LLM이 그 영화를 알아도 답할 수 없습니다.
 
 Windows에서는 WSL2(Ubuntu) 안에서 실행합니다. 저장소도 WSL 홈 아래에 두세요(`/mnt/c/...` 아래에 두지 않습니다).
 
+### 빠른 시작 (Docker만)
+
+Docker와 make, TMDB API 읽기 액세스 토큰, OpenAI API 키만 있으면 됩니다(uv·Node 설치 불필요).
+
+```bash
+git clone https://github.com/ssklpp/Movie_Scene_Finder.git
+cd Movie_Scene_Finder
+cp .env.example .env          # TMDB_READ_TOKEN, OPENAI_API_KEY를 채운다
+make demo                     # seed(영화 20편 색인) → backend(:8000) → frontend(:3000)
+```
+
+처음 한 번은 `seed` 컨테이너가 내 키로 영화 20편을 수집·캡셔닝·색인하느라 약 10분 걸립니다(OpenAI 약 $0.1).
+편수는 `SEED_LIMIT=50 make demo`처럼 바꿉니다. 다시 실행하면 이미 색인된 것을 확인하고 바로 넘어갑니다.
+끝나면 `http://localhost:3000`을 엽니다. 종료는 `make demo-down`(색인 데이터는 볼륨에 남음).
+포트 3000·8000·5432·6333이 비어 있어야 합니다(다른 컨테이너가 쓰고 있으면 그 서비스가 뜨지 않습니다).
+
+미리 만든 색인을 내려받는 방식이 아닌 이유: TMDB 약관이 TMDB 콘텐츠의 2차 저작물(이미지로 만든 캡션·벡터 포함)과
+데이터셋 제공을 허용하지 않아, 각자 자기 키로 만듭니다. 데모 색인은 20편이라 검색 결과와 수치가 아래 300편 기준과 다릅니다.
+썸네일(R2)과 LangSmith 추적은 데모에서 꺼집니다.
+
+### 개발 환경
+
 **필요한 것**: Docker(Compose 포함), [uv](https://docs.astral.sh/uv/), Node.js 22 + pnpm, make, TMDB API 읽기 액세스 토큰, OpenAI API 키
 
 ```bash
