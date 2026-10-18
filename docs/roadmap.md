@@ -44,6 +44,17 @@ MCP 서버, 승인형 HITL, 자동화는 영화 챗봇(IMDb_Top250) 저장소에
 4. `seed` 컨테이너는 `movies`가 비어 있을 때만 파일을 받아 체크섬을 확인하고, `psql`로 카탈로그를, Qdrant REST 스냅샷 업로드로 컬렉션을 복원한다. 마지막에 `QDRANT_SCENES_ALIAS`(`scenes`) 별칭을 다시 건다. 스냅샷에는 별칭이 포함되지 않는다.
 5. `backend`는 `depends_on: seed: condition: service_completed_successfully`로 시드 이후에 뜬다.
 
+### 대안: 스냅샷 대신 벡터 parquet + s08 (구현 때 정한다)
+
+Qdrant 스냅샷 대신 샘플 영화만 남긴 s07 출력(`pipeline/data/vectors/{scenes,movies}.parquet`)을 시드에 넣고, `seed` 컨테이너가 s08로 적재하는 방법도 있다.
+
+| | 스냅샷 복원 | parquet + s08 |
+| --- | --- | --- |
+| Qdrant 버전 호환 | 버전 고정 필요, 올리면 시드를 다시 만든다 | 상관없음 (upsert로 적재) |
+| alias | 복원 후 직접 다시 건다 | s08이 기존 코드대로 `scenes_v{n}` 생성 → alias 교체 |
+| `seed` 이미지 | 작음 (`curl`·`psql`) | 큼 (pipeline 의존성 필요) |
+| 시드 크기 | 비슷함 | 비슷함 |
+
 ### 주의할 점
 
 - **이용약관 확인이 먼저다.** 시드에는 TMDB·KMDb 줄거리 텍스트와 TMDB 이미지로 만든 캡션이 들어간다. 재배포가 허용되는지 확인하고, 어렵다면 줄거리를 빼고 캡션·벡터·제목만 담는다. README의 TMDB 출처 표기는 유지한다.
@@ -65,7 +76,7 @@ MCP 서버, 승인형 HITL, 자동화는 영화 챗봇(IMDb_Top250) 저장소에
 
 지금은 결과 화면의 정답/오답 피드백이 `feedback` 테이블에만 쌓이고, LangSmith 트레이스는 `session_id` 메타데이터로만 묶여 있다. 둘을 이으면 "사용자가 틀렸다고 한 검색"을 트레이스에서 바로 열어 원인을 볼 수 있다.
 
-1. 검색을 시작할 때 루트 run ID를 직접 만들어 그래프 config에 넘기고, `sessions.trace_run_id` 컬럼(alembic 마이그레이션)에 저장한다.
+1. `agent/runtime.py`의 `_run`이 요청마다 루트 run ID를 직접 만들어 그래프 config(`run_id`)에 넘긴다. 트레이스는 세션 하나가 아니라 **요청마다 하나**(`search`, 재질문 답마다 `answer`)이므로, `result` 이벤트를 낸 요청의 run ID로 `sessions.trace_run_id` 컬럼(alembic 마이그레이션)을 덮어쓴다. 첫 `search`의 ID를 저장하면 재질문이 있었던 세션의 피드백이 결과를 만들지 않은 트레이스에 붙는다.
 2. `POST /feedback`에서 DB 저장 후 백그라운드 작업으로 LangSmith `create_feedback(run_id, key="user_correct", score=1|0)`을 보낸다. 추적이 꺼져 있으면 건너뛴다. 응답 속도와 LangSmith 장애가 사용자에게 영향을 주지 않게 하기 위해서다.
 3. LangSmith에서 `user_correct = 0`인 run을 모아 원인을 보고, SPEC §11의 regression 데이터셋(`feedback.is_correct = false` 세션 누적)을 만들 때 트레이스 링크를 함께 남긴다. regression은 아직 만들어지지 않은 데이터셋이라, 이 작업이 그 첫 수집 경로가 된다.
 
@@ -79,6 +90,7 @@ MCP 서버, 승인형 HITL, 자동화는 영화 챗봇(IMDb_Top250) 저장소에
 ### 완료 기준
 
 - [ ] 오답 피드백을 누른 검색이 LangSmith에서 `user_correct = 0`으로 보인다
+- [ ] 재질문 2회 세션의 피드백이 결과를 낸 마지막 `answer` 트레이스에 붙는다
 - [ ] 추적이 꺼진 환경에서도 `/feedback`이 지금처럼 204를 돌려준다
 - [ ] 피드백 전송 실패가 API 응답에 영향을 주지 않는다는 단위 테스트가 있다
 
@@ -91,5 +103,6 @@ MCP 서버, 승인형 HITL, 자동화는 영화 챗봇(IMDb_Top250) 저장소에
 | 위험 | 대응 |
 | --- | --- |
 | TMDB·KMDb 재배포 불가 | 캡션·벡터·제목만 담은 시드로 축소 |
+| 피드백이 엉뚱한 트레이스에 붙음 | 결과를 낸 요청의 run ID로 `trace_run_id` 덮어쓰기, 재질문 세션 테스트 |
 | Qdrant 버전 업 후 스냅샷 복원 실패 | 이미지 버전 고정, `manifest.json`에 Qdrant 버전 기록 |
 | 시드 파일 다운로드 실패 | 체크섬 불일치 시 명확한 오류로 중단, 수동 다운로드 경로를 README에 안내 |
