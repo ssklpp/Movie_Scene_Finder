@@ -1,6 +1,6 @@
 # 보강 계획: 원클릭 실행 · 피드백-트레이스 연결
 
-작성일 2026-10-16 · 상태: 1은 계획, 2는 구현(2026-10-18, 배포 확인 전)
+작성일 2026-10-16 · 상태: 1은 계획, 2는 완료(2026-10-18, PR #5, 배포 확인)
 
 Movie Scene Finder는 관측(LangSmith), 평가(Recall·MRR·p95·비용, `/eval` 대시보드), Postgres 체크포인터, `clarify` 노드의 `interrupt`/`Command(resume=…)`가 이미 갖춰져 있다. 그래서 이 저장소에는 두 가지만 추가한다.
 
@@ -89,7 +89,7 @@ Qdrant 스냅샷 대신 샘플 영화만 남긴 s07 출력(`pipeline/data/vector
 
 ### 완료 기준
 
-- [ ] 오답 피드백을 누른 검색이 LangSmith에서 `user_correct = 0`으로 보인다 (2026-10-18: 작은 그래프로 config `run_id` = 루트 run ID, 그 run에 `user_correct = 0`이 붙는 것까지 실제 LangSmith에서 확인. 배포 서버 검색으로는 아직)
+- [x] 오답 피드백을 누른 검색이 LangSmith에서 `user_correct = 0`으로 보인다 (2026-10-18 배포 서버: "기차 안에서 좀비들이 뛰어오는 장면" → 1위 부산행, 2위 설국열차에 오답 피드백 → 운영 프로젝트 `search` 트레이스에 `user_correct = 0`, comment `movie_id=43`)
 - [x] 재질문 2회 세션의 피드백이 결과를 낸 마지막 `answer` 트레이스에 붙는다 (`test_trace_run_id_is_from_request_that_produced_result`, 재질문 1회 세션으로 확인)
 - [x] 추적이 꺼진 환경에서도 `/feedback`이 지금처럼 204를 돌려준다
 - [x] 피드백 전송 실패가 API 응답에 영향을 주지 않는다는 단위 테스트가 있다 (`test_send_feedback_failure_is_swallowed`, `test_feedback_sent_to_trace_and_failure_keeps_204`)
