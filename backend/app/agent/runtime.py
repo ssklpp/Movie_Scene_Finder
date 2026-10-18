@@ -16,6 +16,7 @@ from langgraph.types import Command
 
 from app.agent.graph import build_graph, has_query, initial_state
 from app.agent.state import Question, ResultItem, SearchState
+from app.core.tracing import tracing_enabled
 from app.db.models import Session as SessionRow
 from app.db.session import SessionLocal
 
@@ -45,7 +46,9 @@ def event(name: str, data: dict[str, Any]) -> Event:
 
 class SessionStore(Protocol):
     def create(self, session_id: str, query_text: str | None, image_key: str | None) -> None: ...
-    def finish(self, session_id: str, state: SearchState) -> None: ...
+    def finish(
+        self, session_id: str, state: SearchState, trace_run_id: uuid.UUID | None = None
+    ) -> None: ...
     def exists(self, session_id: str) -> bool: ...
 
 
@@ -56,7 +59,9 @@ class SqlSessionStore:
         with SessionLocal.begin() as db:
             db.add(SessionRow(id=uuid.UUID(session_id), query_text=query_text, image_key=image_key))
 
-    def finish(self, session_id: str, state: SearchState) -> None:
+    def finish(
+        self, session_id: str, state: SearchState, trace_run_id: uuid.UUID | None = None
+    ) -> None:
         rewritten = state.get("rewritten")
         with SessionLocal.begin() as db:
             row = db.get(SessionRow, uuid.UUID(session_id))
@@ -70,6 +75,7 @@ class SqlSessionStore:
             # 사용자가 재질문에 답하느라 기다린 시간은 빼고 처리 시간만 센다
             row.latency_ms = sum(state.get("timings_ms", {}).values())
             row.cost_usd = Decimal(str(round(state.get("cost_usd", 0.0), 6)))
+            row.trace_run_id = trace_run_id
 
     def exists(self, session_id: str) -> bool:
         try:
@@ -129,9 +135,12 @@ class AgentRuntime:
 
     def _run(self, session_id: str, graph_input: Any, request: str) -> Iterator[Event]:
         # LangSmith: 요청마다 trace 하나. session_id 메타데이터로 첫 검색과 재질문 답을 묶는다.
+        # 루트 run ID를 직접 정해 두고, 결과를 낸 요청의 것을 세션에 남겨 피드백을 붙인다.
+        run_id = uuid.uuid4()
         config: RunnableConfig = {
             **self._config(session_id),
             "run_name": request,
+            "run_id": run_id,
             "metadata": {"session_id": session_id, "request": request},
         }
         started = time.perf_counter()
@@ -159,7 +168,7 @@ class AgentRuntime:
             assert q is not None
             yield question_event(q)
             return
-        self.store.finish(session_id, state)
+        self.store.finish(session_id, state, run_id if tracing_enabled() else None)
         if not has_query(state):
             # 사진만 보냈는데 캡션을 못 만들었다. 같은 사진으로는 다시 해도 소용없어
             # 다른 방법을 안내한다.

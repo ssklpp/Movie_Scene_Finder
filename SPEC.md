@@ -189,7 +189,8 @@ scenes(
 sessions(
   id UUID PK, created_at TIMESTAMPTZ, query_text TEXT, image_key TEXT,
   rewritten JSONB, hard_filters JSONB, clarify_turns INT,
-  result_movie_ids INT[], confidence REAL, latency_ms INT, cost_usd NUMERIC(10,6)
+  result_movie_ids INT[], confidence REAL, latency_ms INT, cost_usd NUMERIC(10,6),
+  trace_run_id UUID           -- 결과를 낸 요청의 LangSmith 루트 run(추적 꺼지면 NULL). /feedback이 user_correct를 붙인다
 )
 feedback(id SERIAL PK, session_id UUID FK, movie_id INT FK, is_correct BOOL, created_at TIMESTAMPTZ)
 eval_runs(
